@@ -1,4 +1,4 @@
-package com.myname.mymodid;
+package com.mrfuzzihead.fluiddrawers;
 
 import java.io.File;
 
