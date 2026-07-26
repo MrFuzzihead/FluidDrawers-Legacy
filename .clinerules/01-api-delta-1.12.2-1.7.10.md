@@ -28,3 +28,26 @@ repo (no decompiled Forge/FML source is checked in, only the StorageDrawers depe
 `migrate/storagedrawers/`) — flag these as unverified leads in whichever mod-specific doc cites them, and confirm
 via IDE decompiler/javadoc before relying on them during implementation.
 
+### FluidDrawers-specific deltas (beyond the generic rulebook)
+
+The following deltas were discovered during the planning audit of the FluidDrawers 1.12.2 source (`migrate/fluiddrawers`)
+against the available 1.7.10 StorageDrawers + Forge environment. These supplement the generic table above.
+
+| FluidDrawers 1.12.2 dependency | 1.7.10 replacement |
+|---|---|
+| **libnine** (`Virtue` base mod, `L9CreativeTab`, `@InitMe`, `L9GuiHandler`/`GuiIdentity`, `L9Models`/baked models, `MathUtils`, `RegisterTile`, `L9BlockStated`, `MirrorUtils`/`MirrorUtils.IField`, `NoopOverrideList`, `BakedQuadList`, `L9ItemBlock`, `GuiComponentFluidTank`, `L9GuiContainer`) | All gone. Replace with: plain `@Mod` + `CreativeTabs` subclass + `GameRegistry.registerBlock/registerItem/registerTileEntity` + `IGuiHandler`/`NetworkRegistry.registerGuiHandler` + `IIcon`/`ISimpleBlockRenderingHandler`/`RenderingRegistry` + `MathHelper.clamp_int` / manual clamp + `Container` + `GuiContainer` + custom fluid-tank widget. `@InitMe` becomes direct calls in proxy preInit/init/postInit. `L9BlockStated` -> plain `Block` + `ForgeDirection` metadata. `MirrorUtils` -> `ReflectionHelper` or manual `Field.setAccessible`. |
+| **Chameleon** (`ChamTileEntity`, `TileDataShim`, `injectPortableData`/`injectData`, `CustomNameData`, `UnlistedModelData`/`ModelData`, `IconUtil`, shim system) | **Not available.** SD 1.7.10 does NOT use Chameleon; `TileEntityDrawers` extends `net.minecraft.tileentity.TileEntity` directly and inlines data in NBT. Reimplement inline in `TileTank` with manual NBT fields. `MaterialData` -> deferred (framed tank). |
+| **Forge capabilities** (1.12.2): `ICapabilityProvider`, `AttachCapabilitiesEvent<Tile>`, `CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY`, `CapabilityDrawerAttributes`, `CapabilityDrawerGroup`, `IFluidHandler` (no-direction), `IFluidTankProperties`, `FluidTankProperties`, `FluidUtil.tryFillContainer`/`FluidActionResult` | **No Forge capability system in 1.7.10.** Use 1.7.10 `IFluidHandler` (`fill(ForgeDirection,FluidStack,boolean)` / `drain(ForgeDirection,FluidStack,boolean)` / `drain(ForgeDirection,int,boolean)` / `canFill`/`canDrain`/`getTankInfo`). TE implements `IFluidHandler` directly. Buckets use `FluidContainerRegistry` (`isFilledContainer`/`fillContainer`/`drainContainer`). Capability wrapper classes deferred to controller-integration stretch milestone. |
+| **SD 1.7.10 API: upgrade items** | `ItemUpgradeStorage` + `EnumUpgradeStorage` do NOT exist. Use `ModItems.upgrade` (metadata) + `config.getStorageUpgradeMultiplier(int)`. `ItemKey` does NOT exist; locking via `ModItems.upgradeLock`. `upgradeConversion`/`upgradeOneStack` do NOT exist. |
+| **SD 1.7.10 API: tiledata classes** | `UpgradeData`/`ControllerData`/`MaterialData`/`CustomNameData` do NOT exist as separate classes; SD 1.7.10 inlines everything in `TileEntityDrawers`. Reimplement inline. |
+| **SD 1.7.10 API: tile base** | SD 1.7.10 uses plain `TileEntity` (via `BaseTileEntity`), NOT `ChamTileEntity`. No `injectPortableData`/`writeToPortableNBT` split. Standard `writeToNBT`/`readFromNBT`. |
+| **1.12.2 rendering -> 1.7.10** | `GlStateManager` -> `GL11`; `BufferBuilder`/`DefaultVertexFormats` -> 1.7.10 `Tessellator.startDrawingQuads`/`addVertexWithUV`/`draw`; `TextureAtlasSprite` -> `IIcon`; `BlockRenderLayer` -> `getRenderBlockPass` int; `IExtendedBlockState`/`IUnlistedProperty` -> TE data directly; JSON models -> `ISimpleBlockRenderingHandler`. |
+| **1.12.2 fluid API -> 1.7.10** | `FluidUtil.tryEmptyContainer`/`tryFillContainer` -> `FluidContainerRegistry.drainContainer`/`fillContainer`. `IFluidTankProperties` -> `FluidTankInfo`. |
+| **1.12.2 block registration** | `RegistryEvent.Register<Block>` / `@ObjectHolder` -> `GameRegistry.registerBlock(block, name)` / `registerTileEntity(clazz, id)` in proxy preInit. |
+| **1.12.2 GUI** | `L9GuiContainer` + `L9GuiHandler` + `GuiIdentity` -> vanilla `GuiContainer` + `IGuiHandler`/`NetworkRegistry.registerGuiHandler`. |
+| **1.12.2 networking** | `SimpleNetworkWrapper.registerMessage` -> same (`cpw.mods.fml.common.network.simpleimpl`), only package changes (`net.minecraftforge.fml` -> `cpw.mods.fml`). |
+| **1.12.2 `@Config`** | -> 1.7.10 `Configuration(File)` class; manual category/key. |
+| **1.12.2 `@Mod.EventBusSubscriber`** | -> explicit `MinecraftForge.EVENT_BUS.register(handlerInstance)` in proxy preInit. |
+| **1.12.2 coremod ASM -> 1.7.10** | -> **Mixins** (UniMixins, boilerplate set up). The three ASM targets (`TileEntityController`, `TileEntityFramingTable`, `ContainerFramingTable`) are all deferred to stretch milestones. No mixins needed for basic tank. |
+
+
