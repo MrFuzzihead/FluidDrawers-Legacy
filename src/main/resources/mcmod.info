@@ -1,21 +1,19 @@
-{
-	"modListVersion": 2,
-	"modList": [{
-		"modid": "${modId}",
-		"name": "${modName}",
-		"description": "An example mod for Minecraft 1.7.10 with Forge focused on a stable setup.",
-		"version": "${modVersion}",
-		"mcversion": "${minecraftVersion}",
-		"url": "https://github.com/SinTh0r4s/MyMod",
-		"updateUrl": "",
-		"authorList": ["SinTho0r4s"],
-		"credits": "",
-		"logoFile": "",
-		"screenshots": [],
-		"parent": "",
-		"requiredMods": [],
-		"dependencies": [],
-		"dependants": [],
-		"useDependencyInformation": false
-	}]
-}
+[
+  {
+    "modid" : "${modId}",
+    "name" : "${modName}",
+    "version" : "${modVersion}",
+    "mcversion" : "${minecraftVersion}",
+    "url" : "https://github.com/MrFuzzihead/FluidDrawers-Legacy",
+    "credits" : "Based on FluidDrawers by MrFuzzihead, ported to 1.7.10",
+    "authors" : [
+      "MrFuzzihead"
+    ],
+    "description" : "Fluid storage system integrated with Storage Drawers controllers. Adds fluid tanks discoverable by the Drawer Controller network.",
+    "logoFile" : "pack.png",
+    "updateUrl" : "https://github.com/MrFuzzihead/FluidDrawers-Legacy/releases/latest",
+    "parent" : "",
+    "screenshots": [
+    ]
+  }
+]

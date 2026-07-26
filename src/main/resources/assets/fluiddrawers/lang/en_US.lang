@@ -1,0 +1,12 @@
+# FluidDrawers Language File
+# Block
+tile.fluiddrawers.tank.name=Fluid Tank
+
+# GUI
+fluiddrawers.container.tank=Fluid Tank
+fluiddrawers.info.tank_capacity=Capacity: %s mB
+
+# GUI Labels (from StorageDrawers)
+storagedrawers.container.upgrades=Upgrades
+storagedrawers.drawers.sealed=Sealed
+
