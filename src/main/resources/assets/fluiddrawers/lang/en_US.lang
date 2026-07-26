@@ -10,3 +10,6 @@ fluiddrawers.info.tank_capacity=Capacity: %s mB
 storagedrawers.container.upgrades=Upgrades
 storagedrawers.drawers.sealed=Sealed
 
+# Creative Tab
+itemGroup.fluiddrawers=Fluid Drawers
+
