@@ -8,6 +8,10 @@ public class ModBlocks {
 
     public static BlockTank TANK;
 
+    // Allocated client-side in ClientProxy.init() via RenderingRegistry.getNextAvailableRenderId().
+    // Stays 0 on the dedicated server (which never renders); BlockTank.getRenderType() reads this.
+    public static int tankRenderId = 0;
+
     public static void init() {
         TANK = new BlockTank();
         GameRegistry.registerBlock(TANK, "tank");
