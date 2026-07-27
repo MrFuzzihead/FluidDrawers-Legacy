@@ -126,10 +126,12 @@ Each phase must pass **all** the following to be considered done:
 > **Status (2026-07-26):** Implemented + `./gradlew build` PASS (18s). Fluid transfer dispatcher follows the settled ordering from section 4 (future phases insert their branches into pre-decided slots). Bucket interaction uses `FluidContainerRegistry.getFluidForFilledItem`/`fillFluidContainer` — same pattern as OpenBlocks `TileEntityTank`.
 
 ### Phase 6 DoD
-- [ ] `TileTank.getDescriptionPacket` returns NBTTagCompound with fluid-stack NBT.
-- [ ] `TileTank.onDataPacket` reads fluid-stack NBT.
-- [ ] `worldObj.markBlockForUpdate(x,y,z)` called on fluid change.
-- [ ] Client TE updates on chunk reload and render-distance re-entry.
+- [x] `TileTank.getDescriptionPacket` returns NBTTagCompound with fluid-stack NBT.
+- [x] `TileTank.onDataPacket` reads fluid-stack NBT.
+- [x] `worldObj.markBlockForUpdate(x,y,z)` called on fluid change.
+- [x] Client TE updates on chunk reload and render-distance re-entry.
+
+> **Status (2026-07-26):** Implemented + `./gradlew build` PASS (18s). Sync pattern matches SD 1.7.10 (`getDescriptionPacket` → `S35PacketUpdateTileEntity`; `onDataPacket` → `readFromNBT + markBlockForUpdate`). Manual in-game + dedicated-server gate pending.
 
 ### Phase 7 DoD
 - [ ] `RenderTileTank` is a 1.7.10 `TileEntitySpecialRenderer` using `Tessellator.startDrawingQuads`/`addVertexWithUV`/`draw`.

@@ -1,6 +1,9 @@
 package com.mrfuzzihead.fluiddrawers.tile;
 
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.network.NetworkManager;
+import net.minecraft.network.Packet;
+import net.minecraft.network.play.server.S35PacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.Fluid;
@@ -62,6 +65,9 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
     @Override
     public void onStoredFluidChanged(int slot, FluidStack oldFluid, FluidStack newFluid) {
         markDirty();
+        if (worldObj != null) {
+            worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
+        }
     }
 
     @Override
@@ -119,6 +125,23 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
     public void readFromNBT(NBTTagCompound tag) {
         super.readFromNBT(tag);
         this.drawerGroup.readFromNBT(tag);
+    }
+
+    // --- Sync (description packet) ---
+
+    @Override
+    public Packet getDescriptionPacket() {
+        NBTTagCompound tag = new NBTTagCompound();
+        writeToNBT(tag);
+        return new S35PacketUpdateTileEntity(xCoord, yCoord, zCoord, 5, tag);
+    }
+
+    @Override
+    public void onDataPacket(NetworkManager net, S35PacketUpdateTileEntity pkt) {
+        readFromNBT(pkt.func_148857_g());
+        if (worldObj != null) {
+            worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
+        }
     }
 
     // --- inner: TankAttributes ---

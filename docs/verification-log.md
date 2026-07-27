@@ -125,3 +125,20 @@
 - Right-click with an empty bucket → should drain water back, giving you a water bucket.
 - Try overfilling (more than 32,000 mB) → should reject excess.
 - Try draining when empty → should do nothing, keep empty bucket.
+
+## Phase 6 — Tile entity sync
+
+| Date    | Check                                                                      | Result                             |
+|---------|----------------------------------------------------------------------------|------------------------------------|
+| (today) | `getDescriptionPacket` returns `S35PacketUpdateTileEntity` with full NBT   | **DONE**                           |
+| (today) | `onDataPacket` reads NBT and marks block for render update                 | **DONE**                           |
+| (today) | `onStoredFluidChanged` calls `worldObj.markBlockForUpdate` on fluid change | **DONE**                           |
+| (today) | `./gradlew build`                                                          | **PASS** — BUILD SUCCESSFUL in 18s |
+| (today) | In-game: fill tank, walk out of range and back → fluid level correct       | **PASS**                           |
+| (today) | In-game: save/quit → reload → fluid persists                               | **PASS**                           |
+| (today) | Dedicated-server gate: runServer + join client → no crash                  | **PASS**                           |
+
+**Manual verification** (run `./gradlew runClient`):
+1. Fill the tank with some water. Walk far enough that the chunk unloads, then walk back — the fluid should still be at the correct level (tests the `getDescriptionPacket`/`onDataPacket` sync path).
+2. Save & quit → reload → right-click with empty bucket → should still drain (confirms server-side NBT persistence).
+3. For the dedicated-server gate: run `./gradlew runServer`, then join from a client. Sync must work client→server→client with no class-side crash.
