@@ -1,17 +1,21 @@
 package com.mrfuzzihead.fluiddrawers.block;
 
 import net.minecraft.block.Block;
+import net.minecraft.block.ITileEntityProvider;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.renderer.texture.IIconRegister;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.IIcon;
+import net.minecraft.world.World;
 
 import com.mrfuzzihead.fluiddrawers.FluidDrawersCreativeTab;
 import com.mrfuzzihead.fluiddrawers.init.ModBlocks;
+import com.mrfuzzihead.fluiddrawers.tile.TileTank;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
-public class BlockTank extends Block {
+public class BlockTank extends Block implements ITileEntityProvider {
 
     @SideOnly(Side.CLIENT)
     private IIcon iconTank;
@@ -21,6 +25,7 @@ public class BlockTank extends Block {
 
     public BlockTank() {
         super(Material.iron);
+        this.isBlockContainer = true;
         this.setBlockName("fluiddrawers.tank");
         this.setHardness(5.0F);
         this.setStepSound(soundTypeMetal);
@@ -60,6 +65,28 @@ public class BlockTank extends Block {
     public boolean canRenderInPass(int pass) {
         return true;
     }
+
+    // --- ITileEntityProvider ---
+
+    @Override
+    public TileEntity createNewTileEntity(World world, int meta) {
+        return new TileTank();
+    }
+
+    @Override
+    public void breakBlock(World world, int x, int y, int z, Block block, int meta) {
+        super.breakBlock(world, x, y, z, block, meta);
+        world.removeTileEntity(x, y, z);
+    }
+
+    @Override
+    public boolean onBlockEventReceived(World world, int x, int y, int z, int eventNum, int eventArg) {
+        super.onBlockEventReceived(world, x, y, z, eventNum, eventArg);
+        TileEntity tile = world.getTileEntity(x, y, z);
+        return tile != null && tile.receiveClientEvent(eventNum, eventArg);
+    }
+
+    // --- icons ---
 
     @Override
     @SideOnly(Side.CLIENT)

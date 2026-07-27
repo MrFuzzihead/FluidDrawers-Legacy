@@ -1,11 +1,13 @@
 package com.mrfuzzihead.fluiddrawers;
 
 import com.mrfuzzihead.fluiddrawers.init.ModBlocks;
+import com.mrfuzzihead.fluiddrawers.tile.TileTank;
 
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
+import cpw.mods.fml.common.registry.GameRegistry;
 
 public class CommonProxy {
 
@@ -13,6 +15,8 @@ public class CommonProxy {
         Config.synchronizeConfiguration(event.getSuggestedConfigurationFile());
 
         ModBlocks.init();
+
+        GameRegistry.registerTileEntity(TileTank.class, "fluiddrawers_tile");
 
         FluidDrawers.LOG.info("I am FluidDrawers at version " + Tags.VERSION);
     }

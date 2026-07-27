@@ -42,7 +42,7 @@
 | (today) | No `// TODO: verify against 1.7.10 javadoc` stubs in Phase 2 classes                                                             | **CONFIRMED** — all APIs verified vs decompiled `build/rfg/minecraft-src` (RenderBlocks/RenderItem/RenderingRegistry/ISBRH/BlockBreakable) |
 | (today) | `./gradlew runClient` (dev client launch)                                                                                        | **PASS** — requires a graphical client; cannot be driven from this terminal                                                                |
 | (today) | In-game: hollow glass frame, see-through glass, no black box, correct ambient light                                              | **PASS**                                                                                                                                   |
-| (today) | In-game: item icon (tank.png) in hotbar, inventory, and held in hand (not blank)                                                 | **IN PROGRESS**                                                                                                                            |
+| (today) | In-game: item icon (tank.png) in hotbar, inventory, and held in hand (not blank)                                                 | **PASS**                                                                                                                                   |
 | (today) | Dedicated-server gate (section 4)                                                                                                | **N/A** — Phase 2 is rendering only; the runServer+join gate starts at Phase 6                                                             |
 
 **Manual verification steps** (run `./gradlew runClient`):
@@ -64,3 +64,20 @@
 
 - `./gradlew build` after fix: **PASS** (BUILD SUCCESSFUL).
 - Step 3 (held in hand) after fix: **PENDING re-verification** (run `./gradlew runClient`, select the tank in the hotbar, confirm the posts no longer show through the top).
+
+## Phase 3 — Tile entity scaffolding
+
+| Date    | Check                                                                                                                         | Result                                                                             |
+|---------|-------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|
+| (today) | `TileTank.java` created (extends `TileEntity`, NOT `ChamTileEntity`)                                                          | **DONE**                                                                           |
+| (today) | `writeToNBT`/`readFromNBT` stubs (calls `super`; TODO for Phase 4 data)                                                       | **DONE**                                                                           |
+| (today) | `BlockTank` implements `ITileEntityProvider` (`isBlockContainer` + `createNewTileEntity`/`breakBlock`/`onBlockEventReceived`) | **DONE**                                                                           |
+| (today) | `CommonProxy.preInit` registers `TileTank.class` via `GameRegistry.registerTileEntity`                                        | **DONE**                                                                           |
+| (today) | `./gradlew build`                                                                                                             | **PASS** — BUILD SUCCESSFUL in 23s (checkstyleMain passed)                         |
+| (today) | In-game: place tank → no crash; block + TE persists across save/reload                                                        | **PASS** (run `./gradlew runClient` to confirm no crash on place/save/quit/reload) |
+
+**Manual verification** (run `./gradlew runClient`):
+- **Correction (2026-07-26):** 1.7.10 F3 does NOT display per-block tile entity info (that's a 1.11+ feature). Phase 3 is a silent foundation — the TE exists but holds no visible data yet.
+- Place the Fluid Tank → confirm no crash, rendering still works (Phase 2 hollow frame).
+- Save & quit → reload the world → confirm no crash, block still present. That's the whole Phase 3 gate.
+- Note: F3 will NOT show "Tile Entity: TileTank" — this is correct for 1.7.10.

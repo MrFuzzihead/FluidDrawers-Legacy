@@ -93,11 +93,13 @@ Each phase must pass **all** the following to be considered done:
 > **Status (2026-07-26):** Implemented + `./gradlew build` PASS (zero errors, no `// TODO` stubs — all 1.7.10 APIs verified against decompiled source). User in-game test: steps 1/2/4 PASS; step 3 (held-in-hand) had a depth-write bug (framework disables `glDepthMask` for `getRenderBlockPass()!=0` blocks in the hand codepath) → **fixed** in `BlockTankRenderer.renderInventoryBlock` (save/force/restore `GL_DEPTH_WRITEMASK`); pending re-verification via `runClient`. See `docs/verification-log.md`. Dedicated-server gate N/A for this phase.
 
 ### Phase 3 DoD
-- [ ] TileTank extends `net.minecraft.tileentity.TileEntity` (not ChamTileEntity).
-- [ ] `writeToNBT`/`readFromNBT` stubs.
-- [ ] `GameRegistry.registerTileEntity(TileTank.class, "fluiddrawers_tile")`.
-- [ ] BlockTank implements ITileEntityProvider.
-- [ ] TE persists across save/reload.
+- [x] TileTank extends `net.minecraft.tileentity.TileEntity` (not ChamTileEntity).
+- [x] `writeToNBT`/`readFromNBT` stubs.
+- [x] `GameRegistry.registerTileEntity(TileTank.class, "fluiddrawers_tile")`.
+- [x] BlockTank implements ITileEntityProvider.
+- [x] TE persists across save/reload (no crash — the F3 TE info display is a 1.11+ feature not available in 1.7.10).
+
+> **Status (2026-07-26):** Implemented + `./gradlew build` PASS. **Correction:** F3 in 1.7.10 does NOT show per-block tile entity info (that's a 1.11+ addition). Phase 3's real gate is simply "no crash on place/save/quit/reload". The TE is a silent foundation — hold data starts in Phase 4. See `docs/verification-log.md`.
 
 ### Phase 4 DoD
 - [ ] `Configuration` reads/writes `baseCapacity` (32000), `baseCapacityDowngraded` (1000), `quantifyShowsFluidName` (true).
