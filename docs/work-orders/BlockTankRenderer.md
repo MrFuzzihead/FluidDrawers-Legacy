@@ -35,8 +35,12 @@
 - [x] `renderInventoryBlock` draws the item explicitly (manages `startDrawingQuads`/`draw` — the framework does NOT wrap the custom path; `shouldRender3DInInventory` = true; GL translate -0.5; full brightness).
 - [x] `BlockTankRenderer` draws the 7-element hollow frame (2 slabs [6 faces] + 4 corner posts [4 side faces] + glass interior cube [4 side faces]) from `tank.json` geometry.
 - [x] Compiles clean (`./gradlew build` BUILD SUCCESSFUL).
-- [ ] **(manual, in-game)** Placed tank shows the hollow glass frame; see through the glass to the back; no black/opaque box; correct ambient light.
-- [ ] **(manual, in-game)** Item icon renders `tank.png` in hotbar, inventory, and held in hand (not blank).
+- [ ] **(manual, in-game)** Placed tank shows the hollow glass frame; see through the glass to the back; no black/opaque box; correct ambient light. *(User-verified PASS 2026-07-26.)*
+- [ ] **(manual, in-game)** Item icon renders `tank.png` in hotbar, inventory, and held in hand (not blank). *(Slots/hotbar PASS; held-in-hand had a depth-write bug — fixed, pending re-verify.)*
+
+## Post-test fix (2026-07-26)
+
+Held-in-hand rendering showed the corner posts bleeding through the top slab (world + inventory slots were fine). Root cause: `ItemRenderer.renderItemInFirstPerson` calls `renderBlockAsItem` with `glDepthMask(false)` for any block with `getRenderBlockPass() != 0` (`ItemRenderer.java:93-98`). Since the tank returns pass 1, depth-write was off, so the opaque metal frame lost occlusion and later-drawn posts showed through the earlier top slab. Fix: `renderInventoryBlock` saves `GL_DEPTH_WRITEMASK`, forces `glDepthMask(true)` for the render, restores afterwards (no-op in the slots path). Same pattern as OpenBlocks `BlockProjectorRenderer`. `./gradlew build` re-verified PASS.
 
 ## Verification notes
 

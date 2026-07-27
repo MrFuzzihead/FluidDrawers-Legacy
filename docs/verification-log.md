@@ -50,3 +50,17 @@
 2. Place the tank — hollow glass frame visible (metal top/bottom slabs + 4 corner posts + glass interior); see through the glass to blocks behind; **no black/opaque box; correct ambient light**.
 3. Hold the tank in-hand (1st/3rd person) — 3D frame renders, not blank.
 4. Break the tank — drops itself; the breaking-progress crack overlay renders (full-cube fallback in `hasOverrideBlockTexture()`).
+
+### User in-game test results + fix (2026-07-26)
+
+- Step 1 (creative-tab item icon): **PASS**
+- Step 2 (placed tank: hollow glass frame, see-through, no black box, correct AO): **PASS**
+- Step 4 (breaking): **PASS**
+- Step 3 (held in hand): **FAIL → FIXED.** The corner posts bled through the top face of the tank *only* when held in-hand (selected in the hotbar). World + inventory slots rendered fine.
+
+  **Root cause (verified vs decompiled `ItemRenderer.java:93-98`):** the held-in-hand code path calls `renderBlockAsItem` with `GL11.glDepthMask(false)` for any block whose `getRenderBlockPass() != 0`. Since the tank returns `getRenderBlockPass()==1`, depth-write was disabled, so the opaque metal frame lost occlusion and the posts (drawn after the top slab) showed through it. The inventory-slot path (`RenderItem.renderItemIntoGUI`) does not disable depth-write, which is why slots were unaffected.
+
+  **Fix:** `BlockTankRenderer.renderInventoryBlock` now saves `GL_DEPTH_WRITEMASK`, forces `glDepthMask(true)` for the render, and restores the caller's state afterward (a no-op in the slots path where it's already on — same pattern as OpenBlocks `BlockProjectorRenderer`).
+
+- `./gradlew build` after fix: **PASS** (BUILD SUCCESSFUL).
+- Step 3 (held in hand) after fix: **PENDING re-verification** (run `./gradlew runClient`, select the tank in the hotbar, confirm the posts no longer show through the top).

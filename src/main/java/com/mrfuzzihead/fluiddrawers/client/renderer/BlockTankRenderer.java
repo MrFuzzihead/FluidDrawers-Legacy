@@ -47,6 +47,15 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
         boolean prevAO = renderer.enableAO;
         renderer.enableAO = false;
 
+        // The held-in-hand codepath (ItemRenderer.renderItemInFirstPerson) calls renderBlockAsItem
+        // with depth-write DISABLED (glDepthMask(false)) for any block whose getRenderBlockPass()
+        // != 0 -- see ItemRenderer.java:95. With depth-write off our opaque metal frame loses
+        // occlusion, so the corner posts (drawn after the top slab) bleed through the top face.
+        // Re-enable depth-write for our render and restore the caller's state afterwards. The
+        // inventory-slot path leaves depth-write on, so this save/restore is a no-op there.
+        boolean prevDepthMask = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
+        GL11.glDepthMask(true);
+
         GL11.glTranslatef(-0.5F, -0.5F, -0.5F);
 
         tess.startDrawingQuads();
@@ -57,6 +66,7 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
 
         GL11.glTranslatef(0.5F, 0.5F, 0.5F);
 
+        GL11.glDepthMask(prevDepthMask);
         renderer.setRenderBounds(0.0, 0.0, 0.0, 1.0, 1.0, 1.0);
         renderer.enableAO = prevAO;
     }

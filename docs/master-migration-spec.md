@@ -90,7 +90,7 @@ Each phase must pass **all** the following to be considered done:
 - [x] BlockTankRenderer draws the 7-element hollow frame (bottom/top slab + 4 corners + glass interior).
 - [x] No black box / incorrect AO behind the glass. Hotbar/hand item renders.
 
-> **Status (2026-07-26):** Implemented + `./gradlew build` PASS (zero errors, no `// TODO` stubs — all 1.7.10 APIs verified against decompiled source). The last (visual) item is **pending `runClient`** in-game verification — see `docs/verification-log.md` for the manual steps. Dedicated-server gate N/A for this phase.
+> **Status (2026-07-26):** Implemented + `./gradlew build` PASS (zero errors, no `// TODO` stubs — all 1.7.10 APIs verified against decompiled source). User in-game test: steps 1/2/4 PASS; step 3 (held-in-hand) had a depth-write bug (framework disables `glDepthMask` for `getRenderBlockPass()!=0` blocks in the hand codepath) → **fixed** in `BlockTankRenderer.renderInventoryBlock` (save/force/restore `GL_DEPTH_WRITEMASK`); pending re-verification via `runClient`. See `docs/verification-log.md`. Dedicated-server gate N/A for this phase.
 
 ### Phase 3 DoD
 - [ ] TileTank extends `net.minecraft.tileentity.TileEntity` (not ChamTileEntity).
