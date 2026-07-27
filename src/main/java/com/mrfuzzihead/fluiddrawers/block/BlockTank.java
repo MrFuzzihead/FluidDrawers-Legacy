@@ -5,6 +5,7 @@ import net.minecraft.block.ITileEntityProvider;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.IIcon;
 import net.minecraft.world.World;
@@ -100,22 +101,32 @@ public class BlockTank extends Block implements ITileEntityProvider {
     @Override
     public boolean onBlockActivated(World world, int x, int y, int z, EntityPlayer player, int side, float hitX,
         float hitY, float hitZ) {
-        if (world.isRemote) return true;
         TileTank tile = (TileTank) world.getTileEntity(x, y, z);
         if (tile == null) return false;
 
         // TODO Phase 11: security-first guard — SecurityManager.hasAccess(player, tile)
 
-        if (player.getHeldItem() != null) {
+        // Capture the original held item ONCE, before any inventory changes happen on
+        // either client or server. Both sides operate on this same snapshot (the same
+        // pattern OpenBlocks uses in TileEntityTank.tryEmptyItem), so the server never
+        // mistakes a client-predicted swap for the actual held item.
+        ItemStack heldItem = player.getHeldItem();
+
+        if (heldItem != null) {
             // Held-item dispatch:
             // TODO Phase 11: ItemKey/ModItems.tape → return false
             // TODO Phase 9: ItemUpgrade → add upgrade
             // TODO Phase 11: ItemPersonalKey → toggle ownership
-            // Fluid transfer (Phase 5) — gated by facing != UP (cans are placed on top face)
+            // Fluid transfer (Phase 5) — gated by facing != UP
 
             if (side != 1 && !tile.getAttributes()
                 .isVoid() /* TODO Phase 11: && !tile.isSealed() */) {
-                if (BlockInteractionUtils.transferFluid(tile, player, ForgeDirection.getOrientation(side), true)) {
+                // Both client and server run the same transferFluid with the original
+                // heldItem snapshot. The client-side TE modification is harmless (it gets
+                // overwritten by the next server → client TE sync), and the item swap
+                // is identical on both sides so the hotbar stays in sync immediately.
+                if (BlockInteractionUtils
+                    .transferFluid(tile, player, heldItem, ForgeDirection.getOrientation(side), true)) {
                     return true;
                 }
             }

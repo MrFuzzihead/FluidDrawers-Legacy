@@ -10,14 +10,13 @@ import net.minecraftforge.fluids.IFluidHandler;
 
 public class BlockInteractionUtils {
 
-    public static boolean transferFluid(IFluidHandler tank, EntityPlayer player, ForgeDirection face, boolean bypass) {
-        if (bypass && tank instanceof BypassableFluidHandler) {
-            tank = new BypassingFluidHandlerWrapper((BypassableFluidHandler) tank);
-        }
-
-        ItemStack heldItem = player.inventory.getCurrentItem();
+    public static boolean transferFluid(IFluidHandler tank, EntityPlayer player, ItemStack heldItem,
+        ForgeDirection face, boolean bypass) {
         if (heldItem == null) {
             return false;
+        }
+        if (bypass && tank instanceof BypassableFluidHandler) {
+            tank = new BypassingFluidHandlerWrapper((BypassableFluidHandler) tank);
         }
 
         // Try to empty a filled container into the tank
@@ -28,7 +27,7 @@ public class BlockInteractionUtils {
                 if (!player.capabilities.isCreativeMode) {
                     ItemStack emptyContainer = FluidContainerRegistry.drainFluidContainer(heldItem);
                     if (emptyContainer != null) {
-                        deductHeldAndGiveItem(player, emptyContainer);
+                        deductHeldAndGiveItem(player, heldItem, emptyContainer);
                     }
                 }
                 return true;
@@ -44,7 +43,7 @@ public class BlockInteractionUtils {
                 if (filledContainer != null) {
                     tank.drain(face, drained.amount, true);
                     if (!player.capabilities.isCreativeMode) {
-                        deductHeldAndGiveItem(player, filledContainer);
+                        deductHeldAndGiveItem(player, heldItem, filledContainer);
                     }
                     return true;
                 }
@@ -55,14 +54,22 @@ public class BlockInteractionUtils {
         return false;
     }
 
-    public static void deductHeldAndGiveItem(EntityPlayer player, ItemStack result) {
+    /**
+     * Consumes one item from the player's held stack (using the ORIGINAL heldItem snapshot,
+     * NOT re-reading the inventory — both client and server must agree on the same original)
+     * and puts the {@code result} in its place or in the inventory.
+     */
+    public static void deductHeldAndGiveItem(EntityPlayer player, ItemStack originalHeld, ItemStack result) {
         if (!player.capabilities.isCreativeMode) {
-            ItemStack heldStack = player.inventory.getCurrentItem();
-            if (heldStack != null) {
-                heldStack.stackSize--;
-                if (heldStack.stackSize <= 0) {
-                    player.inventory.setInventorySlotContents(player.inventory.currentItem, result);
-                } else if (!player.inventory.addItemStackToInventory(result)) {
+            if (originalHeld.stackSize <= 1) {
+                // Original had 1 item: fully consumed → replace the slot with the result
+                player.inventory.setInventorySlotContents(player.inventory.currentItem, result);
+            } else {
+                // Original had > 1: keep the same type in hand with reduced stack
+                ItemStack remaining = originalHeld.copy();
+                remaining.stackSize = originalHeld.stackSize - 1;
+                player.inventory.setInventorySlotContents(player.inventory.currentItem, remaining);
+                if (!player.inventory.addItemStackToInventory(result)) {
                     EntityItem itemEntity = player.entityDropItem(result, 0.0F);
                     if (itemEntity != null) {
                         itemEntity.delayBeforeCanPickup = 0;

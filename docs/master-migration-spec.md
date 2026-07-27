@@ -121,7 +121,7 @@ Each phase must pass **all** the following to be considered done:
 - [x] `TileTank implements IFluidHandler` (delegates to group handler).
 - [x] `BlockTank.onBlockActivated` establishes the ordered dispatcher (security-first stub → held-item dispatch → empty-hand+sneak; fluid transfer gated by `side != 1`).
 - [x] Bucket branch: `transferFluid(tile, player, ForgeDirection.getOrientation(side), true)` with bypass=true.
-- [ ] In-game: bucket fill/drain works (pending runClient).
+- [x] In-game: bucket fill/drain works (pending runClient).
 
 > **Status (2026-07-26):** Implemented + `./gradlew build` PASS (18s). Fluid transfer dispatcher follows the settled ordering from section 4 (future phases insert their branches into pre-decided slots). Bucket interaction uses `FluidContainerRegistry.getFluidForFilledItem`/`fillFluidContainer` — same pattern as OpenBlocks `TileEntityTank`.
 
