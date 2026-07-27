@@ -4,13 +4,16 @@ import net.minecraft.block.Block;
 import net.minecraft.block.ITileEntityProvider;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.renderer.texture.IIconRegister;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.IIcon;
 import net.minecraft.world.World;
+import net.minecraftforge.common.util.ForgeDirection;
 
 import com.mrfuzzihead.fluiddrawers.FluidDrawersCreativeTab;
 import com.mrfuzzihead.fluiddrawers.init.ModBlocks;
 import com.mrfuzzihead.fluiddrawers.tile.TileTank;
+import com.mrfuzzihead.fluiddrawers.util.BlockInteractionUtils;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -84,6 +87,45 @@ public class BlockTank extends Block implements ITileEntityProvider {
         super.onBlockEventReceived(world, x, y, z, eventNum, eventArg);
         TileEntity tile = world.getTileEntity(x, y, z);
         return tile != null && tile.receiveClientEvent(eventNum, eventArg);
+    }
+
+    // --- Interaction dispatcher ---
+    //
+    // Ordered per section 4 of the backport plan (settled, do not reorder):
+    // 1. tile == null → false
+    // 2. security first (Phase 11)
+    // 3. held-item: ItemKey/tape → ItemUpgrade → ItemPersonalKey → fluid transfer
+    // 4. empty hand + sneak: unseal → open GUI
+
+    @Override
+    public boolean onBlockActivated(World world, int x, int y, int z, EntityPlayer player, int side, float hitX,
+        float hitY, float hitZ) {
+        if (world.isRemote) return true;
+        TileTank tile = (TileTank) world.getTileEntity(x, y, z);
+        if (tile == null) return false;
+
+        // TODO Phase 11: security-first guard — SecurityManager.hasAccess(player, tile)
+
+        if (player.getHeldItem() != null) {
+            // Held-item dispatch:
+            // TODO Phase 11: ItemKey/ModItems.tape → return false
+            // TODO Phase 9: ItemUpgrade → add upgrade
+            // TODO Phase 11: ItemPersonalKey → toggle ownership
+            // Fluid transfer (Phase 5) — gated by facing != UP (cans are placed on top face)
+
+            if (side != 1 && !tile.getAttributes()
+                .isVoid() /* TODO Phase 11: && !tile.isSealed() */) {
+                if (BlockInteractionUtils.transferFluid(tile, player, ForgeDirection.getOrientation(side), true)) {
+                    return true;
+                }
+            }
+        } else if (player.isSneaking()) {
+            // Empty hand + sneak:
+            // TODO Phase 11: if sealed → unseal
+            // TODO Phase 8: else if enableDrawerUI → open GUI
+        }
+
+        return false;
     }
 
     // --- icons ---

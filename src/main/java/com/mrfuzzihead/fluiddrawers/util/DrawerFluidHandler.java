@@ -6,12 +6,11 @@ import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidTankInfo;
-import net.minecraftforge.fluids.IFluidHandler;
 
 import com.mrfuzzihead.fluiddrawers.drawers.FluidDrawer;
 import com.mrfuzzihead.fluiddrawers.drawers.FluidDrawerGroup;
 
-public class DrawerFluidHandler implements IFluidHandler {
+public class DrawerFluidHandler implements BypassableFluidHandler {
 
     private final FluidDrawerGroup group;
 
@@ -20,7 +19,7 @@ public class DrawerFluidHandler implements IFluidHandler {
     }
 
     @Override
-    public int fill(ForgeDirection from, FluidStack resource, boolean doFill) {
+    public int fill(ForgeDirection from, FluidStack resource, boolean doFill, boolean bypass) {
         if (resource == null || resource.amount <= 0) {
             return 0;
         }
@@ -29,7 +28,7 @@ public class DrawerFluidHandler implements IFluidHandler {
 
         for (int slotIndex : this.group.getAccessibleFluidDrawerSlots()) {
             resource.amount -= this.group.getFluidDrawer(slotIndex)
-                .insertFluid(resource, doFill, false);
+                .insertFluid(resource, doFill, bypass);
             if (resource.amount <= 0) {
                 return origAmount;
             }
@@ -37,9 +36,14 @@ public class DrawerFluidHandler implements IFluidHandler {
         return origAmount - resource.amount;
     }
 
+    @Override
+    public int fill(ForgeDirection from, FluidStack resource, boolean doFill) {
+        return fill(from, resource, doFill, false);
+    }
+
     @Nullable
     @Override
-    public FluidStack drain(ForgeDirection from, FluidStack resource, boolean doDrain) {
+    public FluidStack drain(ForgeDirection from, FluidStack resource, boolean doDrain, boolean bypass) {
         if (resource == null || resource.amount <= 0) {
             return null;
         }
@@ -48,7 +52,7 @@ public class DrawerFluidHandler implements IFluidHandler {
 
         for (int slotIndex : this.group.getAccessibleFluidDrawerSlots()) {
             FluidStack extracted = this.group.getFluidDrawer(slotIndex)
-                .extractFluid(resource, doDrain, false);
+                .extractFluid(resource, doDrain, bypass);
             if (extracted != null && extracted.amount > 0) {
                 resource.amount -= extracted.amount;
                 if (resource.amount <= 0) {
@@ -63,20 +67,32 @@ public class DrawerFluidHandler implements IFluidHandler {
 
     @Nullable
     @Override
-    public FluidStack drain(ForgeDirection from, int maxDrain, boolean doDrain) {
+    public FluidStack drain(ForgeDirection from, FluidStack resource, boolean doDrain) {
+        return drain(from, resource, doDrain, false);
+    }
+
+    @Nullable
+    @Override
+    public FluidStack drain(ForgeDirection from, int maxDrain, boolean doDrain, boolean bypass) {
         if (maxDrain <= 0) {
             return null;
         }
         for (int slotIndex : this.group.getAccessibleFluidDrawerSlots()) {
             FluidStack fluid = this.group.getFluidDrawer(slotIndex)
-                .extractFluid(maxDrain, false, false);
+                .extractFluid(maxDrain, false, bypass);
             if (fluid != null && fluid.amount > 0) {
                 FluidStack request = fluid.copy();
                 request.amount = maxDrain;
-                return this.drain(from, request, doDrain);
+                return this.drain(from, request, doDrain, bypass);
             }
         }
         return null;
+    }
+
+    @Nullable
+    @Override
+    public FluidStack drain(ForgeDirection from, int maxDrain, boolean doDrain) {
+        return drain(from, maxDrain, doDrain, false);
     }
 
     @Override

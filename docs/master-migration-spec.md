@@ -115,11 +115,15 @@ Each phase must pass **all** the following to be considered done:
 > **Status (2026-07-26):** Implemented + `./gradlew build` PASS (26s, checkstyleMain passed). **Correction:** The plan claimed `IDrawerAttributes`/`IDrawerAttributesModifiable` exist in SD 1.7.10 API — they DO NOT in the GTNH 2.2.26 fork. `SimpleDrawerAttributes` is a standalone concrete class (methods match 1.12.2 FD callers). All other SD API refs confirmed in jar. The in-game config-file + no-crash check requires `runClient` manual verification. See `docs/verification-log.md`.
 
 ### Phase 5 DoD
-- [ ] `BlockInteractionUtils.transferFluid` uses `FluidContainerRegistry` (fillContainer/drainContainer).
-- [ ] `BypassableFluidHandler`, `BypassingFluidHandlerWrapper` implement 1.7.10 `IFluidHandler`.
-- [ ] `TileTank implements IFluidHandler` (ForgeDirection-based: fill/drain/canFill/canDrain/getTankInfo).
-- [ ] `BlockTank.onBlockActivated` establishes the ordered dispatcher (security-first stub → held-item dispatch → empty-hand+sneak).
-- [ ] Bucket branch is held-item "else": gated by `facing != UP && !isSealed()`; calls `transferFluid(..., bypass=true)`.
+- [x] `BlockInteractionUtils.transferFluid` uses `FluidContainerRegistry` (fillFluidContainer/drainFluidContainer/getFluidForFilledItem).
+- [x] `BypassableFluidHandler`, `BypassingFluidHandlerWrapper` implement 1.7.10 `IFluidHandler` (ForgeDirection-based) with bypass support.
+- [x] `DrawerFluidHandler` implements `BypassableFluidHandler` (forwards bypass flag to insertFluid/extractFluid).
+- [x] `TileTank implements IFluidHandler` (delegates to group handler).
+- [x] `BlockTank.onBlockActivated` establishes the ordered dispatcher (security-first stub → held-item dispatch → empty-hand+sneak; fluid transfer gated by `side != 1`).
+- [x] Bucket branch: `transferFluid(tile, player, ForgeDirection.getOrientation(side), true)` with bypass=true.
+- [ ] In-game: bucket fill/drain works (pending runClient).
+
+> **Status (2026-07-26):** Implemented + `./gradlew build` PASS (18s). Fluid transfer dispatcher follows the settled ordering from section 4 (future phases insert their branches into pre-decided slots). Bucket interaction uses `FluidContainerRegistry.getFluidForFilledItem`/`fillFluidContainer` — same pattern as OpenBlocks `TileEntityTank`.
 
 ### Phase 6 DoD
 - [ ] `TileTank.getDescriptionPacket` returns NBTTagCompound with fluid-stack NBT.

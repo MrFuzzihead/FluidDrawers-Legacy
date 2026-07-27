@@ -40,7 +40,7 @@
 
 ## Post-test fix (2026-07-26)
 
-Held-in-hand rendering showed the corner posts bleeding through the top slab (world + inventory slots were fine). Root cause: `ItemRenderer.renderItemInFirstPerson` calls `renderBlockAsItem` with `glDepthMask(false)` for any block with `getRenderBlockPass() != 0` (`ItemRenderer.java:93-98`). Since the tank returns pass 1, depth-write was off, so the opaque metal frame lost occlusion and later-drawn posts showed through the earlier top slab. Fix: `renderInventoryBlock` saves `GL_DEPTH_WRITEMASK`, forces `glDepthMask(true)` for the render, restores afterwards (no-op in the slots path). Same pattern as OpenBlocks `BlockProjectorRenderer`. `./gradlew build` re-verified PASS.
+Held-in-hand rendering showed the corner posts bleeding through the top slab (world + inventory slots were fine). Root cause: `ItemRenderer.renderItemInFirstPerson` calls `renderBlockAsItem` with `glDepthMask(false)` for any block with `getRenderBlockPass() != 0` (`ItemRenderer.java:93-98`). Since the tank returns pass 1, depth-write was off, so the opaque metal frame lost occlusion and later-drawn posts showed through the earlier top slab. Fix: `renderInventoryBlock` saves `GL_DEPTH_WRITEMASK`, forces `glDepthMask(true)` for the render, restores afterward (no-op in the slots path). Same pattern as OpenBlocks `BlockProjectorRenderer`. `./gradlew build` re-verified PASS.
 
 ## Verification notes
 

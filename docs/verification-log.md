@@ -104,3 +104,24 @@
 - Save & quit → reload → no crash (the TE+fluid persists silently).
 
 **Correction from backport plan:** The SD 2.2.26-GTNH API does NOT have `IDrawerAttributes`/`IDrawerAttributesModifiable` interfaces — the plan was incorrect about these. `SimpleDrawerAttributes` is a standalone class providing the same methods as concrete calls, not interface implementations. All other SD API references (`IDrawerGroup`, `LockAttribute`, etc.) are present in the compiled jar.
+
+## Phase 5 — Bucket fill/drain interaction
+
+| Date    | Check                                                                                              | Result                                                                                                                              |
+|---------|----------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| (today) | `BypassableFluidHandler` interface (extends 1.7.10 IFluidHandler with bypass methods)              | **DONE** |
+| (today) | `BypassingFluidHandlerWrapper` (wraps BypassableFluidHandler, passes bypass=true)                  | **DONE** |
+| (today) | `DrawerFluidHandler` updated to implement BypassableFluidHandler (bypass-aware fill/drain)        | **DONE** |
+| (today) | `BlockInteractionUtils.transferFluid` (uses FluidContainerRegistry for bucket interaction)         | **DONE** |
+| (today) | `TileTank implements IFluidHandler` (delegates to group handler)                                   | **DONE** |
+| (today) | `BlockTank.onBlockActivated` establishes the ordered dispatcher with bucket branch                 | **DONE** |
+| (today) | `./gradlew build`                                                                                  | **PASS** — BUILD SUCCESSFUL in 18s |
+| (today) | In-game: right-click with water bucket → bucket empties (fluid stored internally)                  | **PENDING MANUAL** |
+| (today) | In-game: right-click with empty bucket → water bucket returned                                     | **PENDING MANUAL** |
+| (today) | In-game: fill to capacity → further fill rejected; drain to empty → further drain rejected          | **PENDING MANUAL** |
+
+**Manual verification** (run `./gradlew runClient`):
+- Place the tank. Right-click with a water bucket → the bucket should empty (become empty bucket), and the tank internally stores the fluid (not yet visible — Phase 7 adds the fluid rendering).
+- Right-click with an empty bucket → should drain water back, giving you a water bucket.
+- Try overfilling (more than 32,000 mB) → should reject excess.
+- Try draining when empty → should do nothing, keep empty bucket.
