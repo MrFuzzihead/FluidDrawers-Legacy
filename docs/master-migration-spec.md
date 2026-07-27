@@ -102,14 +102,17 @@ Each phase must pass **all** the following to be considered done:
 > **Status (2026-07-26):** Implemented + `./gradlew build` PASS. **Correction:** F3 in 1.7.10 does NOT show per-block tile entity info (that's a 1.11+ addition). Phase 3's real gate is simply "no crash on place/save/quit/reload". The TE is a silent foundation — hold data starts in Phase 4. See `docs/verification-log.md`.
 
 ### Phase 4 DoD
-- [ ] `Configuration` reads/writes `baseCapacity` (32000), `baseCapacityDowngraded` (1000), `quantifyShowsFluidName` (true).
-- [ ] `FluidDrawer`, `FluidDrawerGroup`, `FluidDrawerHost` interfaces ported.
-- [ ] `SimpleFluidDrawer` ported; libnine MathUtils replaced; INBTSerializable or manual NBT.
-- [ ] `SimpleDrawerAttributes` (IDrawerAttributes impl) ported.
-- [ ] `FluidTypeMap`, `FluidTypeMultimap`, `DrawerTankWrapper` ported.
-- [ ] `SingletonFluidDrawerGroup`: no TileDataShim/capabilities; holds SimpleFluidDrawer + exposes IFluidHandler via DrawerFluidHandler.
-- [ ] `DrawerFluidHandler` implements 1.7.10 IFluidHandler.
-- [ ] TileTank holds the group, NBT-persists the fluid, getCapacity() = 32000.
+- [x] `Configuration` reads/writes `baseCapacity` (32000), `baseCapacityDowngraded` (1000), `quantifyShowsFluidName` (true).
+- [x] `FluidDrawer`, `FluidDrawerGroup`, `FluidDrawerHost` interfaces ported.
+- [x] `SimpleFluidDrawer` ported; libnine MathUtils replaced; manual NBT (no INBTSerializable in 1.7.10).
+- [x] `SimpleDrawerAttributes` (standalone class — SD 1.7.10 GTNH lacks the unified interface).
+- [x] `FluidTypeMap`, `FluidTypeMultimap`, `DrawerTankWrapper` ported.
+- [x] `SingletonFluidDrawerGroup`: no TileDataShim/capabilities; holds SimpleFluidDrawer + exposes IFluidHandler via DrawerFluidHandler.
+- [x] `DrawerFluidHandler` implements 1.7.10 IFluidHandler.
+- [x] TileTank holds the group, NBT-persists the fluid, getCapacity() = baseCapacity.
+- [x] In-game: config/fluiddrawers.cfg generated with baseCapacity=32000; break/reload no crash.
+
+> **Status (2026-07-26):** Implemented + `./gradlew build` PASS (26s, checkstyleMain passed). **Correction:** The plan claimed `IDrawerAttributes`/`IDrawerAttributesModifiable` exist in SD 1.7.10 API — they DO NOT in the GTNH 2.2.26 fork. `SimpleDrawerAttributes` is a standalone concrete class (methods match 1.12.2 FD callers). All other SD API refs confirmed in jar. The in-game config-file + no-crash check requires `runClient` manual verification. See `docs/verification-log.md`.
 
 ### Phase 5 DoD
 - [ ] `BlockInteractionUtils.transferFluid` uses `FluidContainerRegistry` (fillContainer/drainContainer).

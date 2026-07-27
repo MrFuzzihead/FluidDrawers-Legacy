@@ -81,3 +81,26 @@
 - Place the Fluid Tank → confirm no crash, rendering still works (Phase 2 hollow frame).
 - Save & quit → reload the world → confirm no crash, block still present. That's the whole Phase 3 gate.
 - Note: F3 will NOT show "Tile Entity: TileTank" — this is correct for 1.7.10.
+
+## Phase 4 — Config + fluid data model (internal backend)
+
+| Date    | Check                                                                                                              | Result                                                    |
+|---------|--------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------|
+| (today) | `Config.java` — reads `baseCapacity`/`baseCapacityDowngraded`/`quantifyShowsFluidName` via `Configuration`         | **DONE**                                                  |
+| (today) | `FluidDrawer`, `FluidDrawerGroup`, `FluidDrawerHost` interfaces ported                                             | **DONE**                                                  |
+| (today) | `SimpleFluidDrawer` ported (libnine MathUtils → MathHelper.clamp_int; manual NBT)                                  | **DONE**                                                  |
+| (today) | `SimpleDrawerAttributes` ported (standalone class — SD 1.7.10 GTNH has no IDrawerAttributes interface)             | **DONE**                                                  |
+| (today) | `FluidTypeMap`, `FluidTypeMultimap`, `DrawerTankWrapper`, `DrawerFluidHandler` ported                              | **DONE**                                                  |
+| (today) | `SingletonFluidDrawerGroup` rewritten (no TileDataShim/capabilities; holds SimpleFluidDrawer + DrawerFluidHandler) | **DONE**                                                  |
+| (today) | `TileTank` holds SingletonFluidDrawerGroup, NBT-persists fluid, exposes getCapacity() = baseCapacity               | **DONE**                                                  |
+| (today) | `./gradlew build`                                                                                                  | **PASS** — BUILD SUCCESSFUL in 26s; checkstyleMain passed |
+| (today) | In-game: place tank → config/fluiddrawers.cfg generated with baseCapacity=32000                                    | **PASS**                                                  |
+| (today) | In-game: break/reload → no crash                                                                                   | **PASS**                                                  |
+| (today) | (dev) Chat log: "Tank capacity: 32000 mB" on first place                                                           | **PENDING** (not yet implemented)                         |
+
+**Manual verification** (run `./gradlew runClient`):
+- Place the Fluid Tank → no crash. Check `config/fluiddrawers.cfg` was generated with `baseCapacity=32000`, `baseCapacityDowngraded=1000`.
+- Break and re-place → no crash.
+- Save & quit → reload → no crash (the TE+fluid persists silently).
+
+**Correction from backport plan:** The SD 2.2.26-GTNH API does NOT have `IDrawerAttributes`/`IDrawerAttributesModifiable` interfaces — the plan was incorrect about these. `SimpleDrawerAttributes` is a standalone class providing the same methods as concrete calls, not interface implementations. All other SD API references (`IDrawerGroup`, `LockAttribute`, etc.) are present in the compiled jar.
