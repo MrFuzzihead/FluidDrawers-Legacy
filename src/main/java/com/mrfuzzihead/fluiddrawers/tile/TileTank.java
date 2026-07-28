@@ -15,6 +15,7 @@ import net.minecraftforge.fluids.FluidTankInfo;
 import net.minecraftforge.fluids.IFluidHandler;
 
 import com.mrfuzzihead.fluiddrawers.Config;
+import com.mrfuzzihead.fluiddrawers.drawers.DrawerUpgradable;
 import com.mrfuzzihead.fluiddrawers.drawers.FluidDrawerGroup;
 import com.mrfuzzihead.fluiddrawers.drawers.FluidDrawerHost;
 import com.mrfuzzihead.fluiddrawers.drawers.SingletonFluidDrawerGroup;
@@ -29,6 +30,7 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
     private final SingletonFluidDrawerGroup drawerGroup;
     private final TankAttributes attributes;
     private final UpgradeInventory upgradeInventory;
+    private final TankUpgradeData upgradeData;
 
     public static final int UPGRADE_SLOT_COUNT = 7;
 
@@ -36,6 +38,7 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
         this.attributes = new TankAttributes();
         this.drawerGroup = new SingletonFluidDrawerGroup(this);
         this.upgradeInventory = new UpgradeInventory();
+        this.upgradeData = new TankUpgradeData();
     }
 
     public SingletonFluidDrawerGroup getDrawerGroup() {
@@ -68,19 +71,80 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
         return Config.baseCapacity;
     }
 
+    /**
+     * Returns the base capacity multiplied by the storage upgrade multiplier,
+     * or the downgraded base capacity if a downgrade is installed.
+     * Phase 9: delegates to the upgrade-aware implementation.
+     */
     @Override
     public int getModifiedBaseCapacity() {
-        return getUnmodifiedBaseCapacity();
+        return upgradeData.isDowngraded() ? getDowngradedBaseCapacity()
+            : getUnmodifiedBaseCapacity() * getStorageMultiplier();
     }
 
+    /**
+     * Returns the downgraded base capacity (from config) multiplied by the
+     * storage upgrade multiplier.
+     */
+    public int getDowngradedBaseCapacity() {
+        return Config.baseCapacityDowngraded * getStorageMultiplier();
+    }
+
+    /**
+     * Phase 9: Sum the storage upgrade multipliers from all installed storage
+     * upgrades ({@code ItemUpgrade} with metadata >= 2). Returns at least 1.
+     */
     @Override
     public int getStorageMultiplier() {
-        return 1;
+        int multiplier = 0;
+        for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
+            ItemStack upgrade = upgradeData.getUpgrade(i);
+            if (upgrade != null && DrawerUpgradable.isStorageUpgrade(upgrade)) {
+                multiplier += DrawerUpgradable.getStorageMultiplier(upgrade);
+            }
+        }
+        return Math.max(multiplier, 1);
     }
 
     @Override
     public SimpleDrawerAttributes getAttributes() {
         return attributes;
+    }
+
+    // --- Upgrade accessors ---
+
+    /**
+     * Returns true if a downgrade upgrade is installed.
+     */
+    public boolean isDowngraded() {
+        return upgradeData.isDowngraded();
+    }
+
+    /**
+     * Check if a storage upgrade can be removed from the given slot without
+     * dropping the fluid below the new (lower) capacity.
+     */
+    public boolean canRemoveUpgrade(int slot) {
+        return upgradeData.canRemoveUpgrade(slot);
+    }
+
+    /**
+     * Notify the world that this block's state has changed.
+     */
+    public void notifyBlockUpdate() {
+        if (worldObj != null) {
+            worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
+        }
+    }
+
+    /**
+     * Notify adjacent blocks of a neighbor change (for redstone upgrade).
+     */
+    public void notifyNeighbors() {
+        if (worldObj != null) {
+            worldObj.notifyBlocksOfNeighborChange(xCoord, yCoord, zCoord, blockType);
+            worldObj.notifyBlocksOfNeighborChange(xCoord, yCoord - 1, zCoord, blockType);
+        }
     }
 
     @Override
@@ -153,12 +217,16 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
     public void writeToNBT(NBTTagCompound tag) {
         super.writeToNBT(tag);
         this.drawerGroup.writeToNBT(tag);
+        tag.setTag("Attributes", this.attributes.serializeNBT());
+        this.upgradeData.writeToNBT(tag);
     }
 
     @Override
     public void readFromNBT(NBTTagCompound tag) {
         super.readFromNBT(tag);
         this.drawerGroup.readFromNBT(tag);
+        this.attributes.deserializeNBT(tag.getCompoundTag("Attributes"));
+        this.upgradeData.readFromNBT(tag);
     }
 
     // --- Sync (description packet) ---
@@ -190,27 +258,144 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
     }
 
     /**
-     * Exposes the stub upgrade IInventory (7 slots, inert until Phase 9).
+     * Exposes the upgrade IInventory (7 slots, wired up in Phase 9).
      */
     public IInventory getUpgradeInventory() {
         return this.upgradeInventory;
     }
 
-    // --- inner: UpgradeInventory (stub, 7 slots, inert until Phase 9) ---
+    // --- inner: TankUpgradeData ---
 
     /**
-     * Stub inventory for the 7 upgrade slots. All 7 slots are empty and reject any
-     * item ({@link #isItemValidForSlot} returns false). Phase 9 wires up the real
-     * upgrade logic including {@code canAddUpgrade}/{@code canRemoveUpgrade} and
-     * capacity/attribute changes.
-     *
-     * <p>
-     * NBT persistence is handled here so upgrade contents survive save/reload even
-     * before Phase 9 makes them meaningful (simplifies the Phase 9 diff).
+     * Upgrade data manager for the tank. Tracks installed upgrades and validates
+     * add/remove operations. Ports the 1.12.2
+     * {@code TileTank.TankUpgradeData}.
+     */
+    private class TankUpgradeData {
+
+        private final ItemStack[] upgradeSlots = new ItemStack[UPGRADE_SLOT_COUNT];
+        private boolean downgraded = false;
+
+        public boolean canAddUpgrade(ItemStack upgrade) {
+            if (!DrawerUpgradable.isUpgradeItem(upgrade)) {
+                return false;
+            }
+            if (upgrade.getItem() instanceof com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeStatus) {
+                return false;
+            }
+            if (DrawerUpgradable.isStorageUpgrade(upgrade)) {
+                int newMult = getStorageMultiplier() + DrawerUpgradable.getStorageMultiplier(upgrade);
+                return isCapacityAcceptable(getUnmodifiedBaseCapacity() * newMult);
+            }
+            return true;
+        }
+
+        public boolean canRemoveUpgrade(int slot) {
+            ItemStack upgrade = slot >= 0 && slot < UPGRADE_SLOT_COUNT ? upgradeSlots[slot] : null;
+            if (upgrade == null) {
+                return false;
+            }
+            if (DrawerUpgradable.isStorageUpgrade(upgrade)) {
+                int thisMult = DrawerUpgradable.getStorageMultiplier(upgrade);
+                int remainingMult = Math.max(getStorageMultiplier() - thisMult, 1);
+                int newCapacity = getUnmodifiedBaseCapacity() * remainingMult;
+                return isCapacityAcceptable(newCapacity);
+            }
+            return true;
+        }
+
+        private boolean isCapacityAcceptable(int newCapacity) {
+            FluidStack fluid = drawerGroup.getFluidDrawer()
+                .getStoredFluid();
+            return fluid == null || fluid.amount <= newCapacity;
+        }
+
+        public void setUpgrade(int slot, ItemStack stack) {
+            if (slot >= 0 && slot < UPGRADE_SLOT_COUNT) {
+                if (stack != null) {
+                    stack = stack.copy();
+                    stack.stackSize = 1;
+                }
+                upgradeSlots[slot] = stack;
+            }
+            updateDowngradeState();
+            notifyBlockUpdate();
+        }
+
+        public void clearUpgrade(int slot) {
+            if (slot >= 0 && slot < UPGRADE_SLOT_COUNT) {
+                upgradeSlots[slot] = null;
+            }
+            updateDowngradeState();
+            notifyBlockUpdate();
+        }
+
+        public ItemStack getUpgrade(int slot) {
+            if (slot < 0 || slot >= UPGRADE_SLOT_COUNT) {
+                return null;
+            }
+            return upgradeSlots[slot];
+        }
+
+        public boolean isDowngraded() {
+            return downgraded;
+        }
+
+        private void updateDowngradeState() {
+            boolean wasDowngraded = downgraded;
+            downgraded = false;
+            for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
+                ItemStack upgrade = upgradeSlots[i];
+                if (upgrade != null && DrawerUpgradable.isDowngrade(upgrade)) {
+                    downgraded = true;
+                    break;
+                }
+            }
+            if (downgraded != wasDowngraded) {
+                notifyBlockUpdate();
+            }
+        }
+
+        public void writeToNBT(NBTTagCompound tag) {
+            NBTTagCompound upgradesTag = new NBTTagCompound();
+            for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
+                ItemStack stack = upgradeSlots[i];
+                if (stack != null) {
+                    NBTTagCompound slotTag = new NBTTagCompound();
+                    stack.writeToNBT(slotTag);
+                    upgradesTag.setTag("Upgrade" + i, slotTag);
+                }
+            }
+            tag.setTag("Upgrades", upgradesTag);
+            tag.setBoolean("Downgraded", downgraded);
+        }
+
+        public void readFromNBT(NBTTagCompound tag) {
+            for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
+                upgradeSlots[i] = null;
+            }
+            if (tag.hasKey("Upgrades")) {
+                NBTTagCompound upgradesTag = tag.getCompoundTag("Upgrades");
+                for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
+                    String key = "Upgrade" + i;
+                    if (upgradesTag.hasKey(key)) {
+                        NBTTagCompound slotTag = upgradesTag.getCompoundTag(key);
+                        upgradeSlots[i] = ItemStack.loadItemStackFromNBT(slotTag);
+                    }
+                }
+            }
+            downgraded = tag.getBoolean("Downgraded");
+        }
+    }
+
+    // --- inner: UpgradeInventory ---
+
+    /**
+     * Inventory for the 7 upgrade slots, backed by {@link TankUpgradeData}.
+     * Phase 9 wires up {@link #isItemValidForSlot} via
+     * {@link TankUpgradeData#canAddUpgrade}.
      */
     private class UpgradeInventory implements IInventory {
-
-        private final ItemStack[] slots = new ItemStack[UPGRADE_SLOT_COUNT];
 
         @Override
         public int getSizeInventory() {
@@ -219,44 +404,30 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
 
         @Override
         public ItemStack getStackInSlot(int index) {
-            return slots[index];
+            return upgradeData.getUpgrade(index);
         }
 
         @Override
         public ItemStack decrStackSize(int index, int count) {
-            if (slots[index] != null) {
-                ItemStack result;
-                if (slots[index].stackSize <= count) {
-                    result = slots[index];
-                    slots[index] = null;
-                    onInventoryChanged();
-                } else {
-                    result = slots[index].splitStack(count);
-                    if (slots[index].stackSize == 0) {
-                        slots[index] = null;
-                    }
-                    onInventoryChanged();
-                }
-                return result;
+            ItemStack stack = upgradeData.getUpgrade(index);
+            if (stack != null) {
+                upgradeData.clearUpgrade(index);
             }
-            return null;
+            return stack;
         }
 
         @Override
         public ItemStack getStackInSlotOnClosing(int index) {
-            if (slots[index] != null) {
-                ItemStack result = slots[index];
-                slots[index] = null;
-                onInventoryChanged();
-                return result;
+            ItemStack stack = upgradeData.getUpgrade(index);
+            if (stack != null) {
+                upgradeData.clearUpgrade(index);
             }
-            return null;
+            return stack;
         }
 
         @Override
         public void setInventorySlotContents(int index, ItemStack stack) {
-            slots[index] = stack;
-            onInventoryChanged();
+            upgradeData.setUpgrade(index, stack);
         }
 
         @Override
@@ -292,8 +463,7 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
 
         @Override
         public boolean isItemValidForSlot(int index, ItemStack stack) {
-            // Phase 9: delegate to UpgradeData.canAddUpgrade(stack)
-            return false;
+            return upgradeData.canAddUpgrade(stack);
         }
 
         public void onInventoryChanged() {

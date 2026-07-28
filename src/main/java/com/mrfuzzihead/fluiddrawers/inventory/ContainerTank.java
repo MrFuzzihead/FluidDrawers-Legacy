@@ -32,9 +32,9 @@ public class ContainerTank extends Container {
     public ContainerTank(InventoryPlayer playerInv, TileTank tile) {
         this.tile = tile;
 
-        // 7 upgrade slots (inert until Phase 9)
+        // 7 upgrade slots (wired up in Phase 9)
         for (int i = 0; i < 7; i++) {
-            this.addSlotToContainer(new SlotDrawerUpgrade(tile.getUpgradeInventory(), i, 26 + i * 18, 86));
+            this.addSlotToContainer(new SlotDrawerUpgrade(tile, i, 26 + i * 18, 86));
         }
 
         // Player inventory (3 rows × 9 col, starting at y=117)

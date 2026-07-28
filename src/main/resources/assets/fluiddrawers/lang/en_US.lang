@@ -13,3 +13,6 @@ storagedrawers.drawers.sealed=Sealed
 # Creative Tab
 itemGroup.fluiddrawers=Fluid Drawers
 
+# Upgrade messages
+fluiddrawers.info.capacity_exceeded=Cannot remove upgrade: fluid exceeds new capacity
+
