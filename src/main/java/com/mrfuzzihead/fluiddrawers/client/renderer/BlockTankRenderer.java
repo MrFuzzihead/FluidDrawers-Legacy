@@ -43,6 +43,18 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
         // startDrawingQuads/draw wrapper and has already bound the block atlas + set up the
         // isometric view (and blend, since getRenderBlockPass()==1). We manage tessellation
         // ourselves and center the 0..1 model at the origin with a -0.5 translate.
+        //
+        // Brightness is NOT forced here. renderBlockAsItem does not set a brightness for the custom
+        // path, so the quads inherit the lightmap current coord set by each caller:
+        // - Inventory slot: GuiContainer sets setLightmapTextureCoords(240, 240) = full bright
+        // (GuiContainer:105-107), so the icon stays fully lit.
+        // - Held in hand: ItemRenderer.renderItemInFirstPerson sets the lightmap to the player's
+        // ambient world light (ItemRenderer:287-290), so the held tank is dark at night.
+        // - Dropped entity: ambient world light, so it is dark at night.
+        // Forcing setBrightness(15728880) here previously made the item glow full-bright (near-white
+        // in complete darkness) in the hand and on the ground. Per-face directional shading
+        // (setColorOpaque_F in drawBox) is still applied for the 3D look. Matches the OpenBlocks
+        // pattern (BlockProjectorRenderer / ItemRendererTank do not force item brightness).
         Tessellator tess = Tessellator.instance;
         boolean prevAO = renderer.enableAO;
         renderer.enableAO = false;
@@ -59,7 +71,9 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
         GL11.glTranslatef(-0.5F, -0.5F, -0.5F);
 
         tess.startDrawingQuads();
-        tess.setBrightness(15728880); // 0xF000F0: full sky + block light for the inventory icon
+        // No setBrightness: use the ambient/GUI lightmap (see comment above). renderFace* with
+        // enableAO=false emits vertices carrying the per-face setColorOpaque_F directional shade
+        // and the caller's lightmap current coord.
         renderMetalFrame(tank, iconTank, renderer, 0.0, 0.0, 0.0);
         renderGlass(tank, iconGlass, renderer, 0.0, 0.0, 0.0);
         tess.draw();

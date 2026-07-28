@@ -117,23 +117,28 @@ public class RenderTileTank extends TileEntitySpecialRenderer {
         // Fluid still icons live on the block atlas (Fluid.getSpriteNumber() == 0).
         bindTexture(TextureMap.locationBlocksTexture);
 
-        // --- GL state: blend on, fixed-function lighting + cull off. Blend handles the alpha
-        // cases; disabling lighting stops the tint being darkened by the OpenGL light (the
-        // lightmap on texture unit 1 still applies via the texture env); disabling cull guarantees
-        // both faces of the fluid box render so it is visible from any angle. ---
-        boolean prevBlend = GL11.glGetBoolean(GL11.GL_BLEND);
+        // --- GL state: minimal and symmetric. Blend is enabled ONLY for translucent fluids
+        // (gaseous / lighter-than-air, alpha < 1.0). The common opaque case (water, lava) leaves
+        // blend untouched, which eliminates a class of GL-state leak (a rare white flash observed
+        // during fill when blend was left enabled for opaque quads). Fixed-function GL lighting is
+        // disabled for the draw so the OpenGL light does not double-darken the tint; the lightmap
+        // (texture unit 1) still applies via the texture env. The fluid box is convex, so default
+        // back-face culling renders it correctly from every exterior angle -- GL_CULL_FACE is left
+        // untouched (not disabling it removes another leak surface). ---
         boolean prevLighting = GL11.glGetBoolean(GL11.GL_LIGHTING);
-        boolean prevCull = GL11.glGetBoolean(GL11.GL_CULL_FACE);
         float prevLX = OpenGlHelper.lastBrightnessX;
         float prevLY = OpenGlHelper.lastBrightnessY;
+        boolean useBlend = alpha < 1.0F;
 
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
         GL11.glDisable(GL11.GL_LIGHTING);
-        GL11.glDisable(GL11.GL_CULL_FACE);
+        if (useBlend) {
+            GL11.glEnable(GL11.GL_BLEND);
+            GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        }
 
         // DoD: apply the lightmap via OpenGlHelper.setLightmapTextureCoords (matches SD's
-        // TileEntityDrawersRenderer). lu/lv = (blockLight<<4, skyLight<<4).
+        // TileEntityDrawersRenderer). lu/lv = (blockLight<<4, skyLight<<4). Per-vertex
+        // setBrightness(ambLight) below bakes the same coords into the quads as a guarantee.
         OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, ambLight % 65536, ambLight / 65536);
 
         GL11.glPushMatrix();
@@ -162,9 +167,8 @@ public class RenderTileTank extends TileEntitySpecialRenderer {
 
         // --- restore GL state so subsequent rendering is unaffected ---
         OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, prevLX, prevLY);
-        if (prevCull) GL11.glEnable(GL11.GL_CULL_FACE);
         if (prevLighting) GL11.glEnable(GL11.GL_LIGHTING);
-        if (!prevBlend) GL11.glDisable(GL11.GL_BLEND);
+        if (useBlend) GL11.glDisable(GL11.GL_BLEND);
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
 
         // TODO Phase 14: if (tile.getAttributes().isShowingQuantity()) render the floating

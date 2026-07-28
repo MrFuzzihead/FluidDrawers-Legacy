@@ -42,6 +42,11 @@
 
 Held-in-hand rendering showed the corner posts bleeding through the top slab (world + inventory slots were fine). Root cause: `ItemRenderer.renderItemInFirstPerson` calls `renderBlockAsItem` with `glDepthMask(false)` for any block with `getRenderBlockPass() != 0` (`ItemRenderer.java:93-98`). Since the tank returns pass 1, depth-write was off, so the opaque metal frame lost occlusion and later-drawn posts showed through the earlier top slab. Fix: `renderInventoryBlock` saves `GL_DEPTH_WRITEMASK`, forces `glDepthMask(true)` for the render, restores afterward (no-op in the slots path). Same pattern as OpenBlocks `BlockProjectorRenderer`. `./gradlew build` re-verified PASS.
 
+## Post-test fix #2 (2026-07-26) — item brightness / glow in the dark
+
+The tank item (held in hand, dropped on the ground, and in the inventory) glowed near-white in complete darkness. Root cause: `renderInventoryBlock` hardcoded `tess.setBrightness(15728880)` (full-bright). `renderBlockAsItem` does NOT set brightness for the custom-render path (RenderBlocks:8361 dispatch is bare), so the hardcode overrode the caller's lightmap: the held item's caller (`ItemRenderer.renderItemInFirstPerson:287-290`) sets the lightmap to the player's AMBIENT light, which the hardcode replaced with full-bright -> the item glowed regardless of darkness. Fix: removed the hardcoded `setBrightness`; the item now inherits the caller's lightmap current coord -- inventory slot uses `GuiContainer`'s `(240,240)` full-bright (GuiContainer:105-107, icon stays lit), held/dropped use ambient (dark at night). Per-face directional shading preserved. Matches the OpenBlocks pattern (`BlockProjectorRenderer` / `ItemRendererTank` do not force item brightness). `./gradlew build` re-verified PASS. See `docs/verification-log.md` Finding 3.
+
+
 ## Verification notes
 
 All 1.7.10 APIs were verified against the decompiled source in `build/rfg/minecraft-src` (no guessing):

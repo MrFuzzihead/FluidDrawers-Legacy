@@ -8,6 +8,7 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.IIcon;
+import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
@@ -68,6 +69,20 @@ public class BlockTank extends Block implements ITileEntityProvider {
     @Override
     public boolean canRenderInPass(int pass) {
         return true;
+    }
+
+    // --- Light emission ---
+
+    // A tank holding a luminous fluid (e.g. lava) emits that fluid's light level. Delegates to the
+    // tile's stored fluid luminosity (unscaled by fill -- matches the OpenBlocks Tank reference;
+    // 1.12.2 FluidDrawers does not override getLightValue). The Forge-added
+    // getLightValue(IBlockAccess, x, y, z) is the world/lighting-engine entry point (Block:1497);
+    // the rendering pipeline also feeds it into getLightBrightnessForSkyBlocks (Block:609/615).
+    // TileTank.onStoredFluidChanged triggers a relight (func_147451_t) when the luminosity changes.
+    @Override
+    public int getLightValue(IBlockAccess world, int x, int y, int z) {
+        TileEntity tile = world.getTileEntity(x, y, z);
+        return tile instanceof TileTank ? ((TileTank) tile).getFluidLightLevel() : 0;
     }
 
     // --- ITileEntityProvider ---

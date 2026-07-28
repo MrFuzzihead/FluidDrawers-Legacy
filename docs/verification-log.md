@@ -145,17 +145,17 @@
 
 ## Phase 7 — Fluid TESR rendering
 
-| Date    | Check                                                                | Result                                                                                                                              |
-|---------|----------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
-| (today) | `RenderTileTank` (new TESR) created                                  | **DONE**                                                                                                                            |
-| (today) | `TileTank.shouldRenderInPass(0)` override added                      | **DONE**                                                                                                                            |
-| (today) | `ClientRegistry.bindTileEntitySpecialRenderer` in `ClientProxy.init` | **DONE**                                                                                                                            |
-| (today) | `./gradlew build`                                                    | **PASS** — BUILD SUCCESSFUL in 21s (`:compileJava`, `:checkstyleMain`, `:jar`, `:reobfJar`; Spotless applied)                       |
-| (today) | `./gradlew runClient` (dev client launch)                            | **PENDING** — requires manual launch (interactive GUI); agent shell cannot run an interactive Minecraft client                      |
-| (today) | In-game: water renders blue inside, level rises with fill            | **PENDING** — manual                                                                                                                |
-| (today) | In-game: drain → level falls                                         | **PENDING** — manual                                                                                                                |
-| (today) | In-game: lava → different color/icon                                 | **PENDING** — manual                                                                                                                |
-| (today) | In-game: torch added/removed next to tank → fluid brightness tracks  | **PENDING** — manual (tests the `getLightBrightnessForSkyBlocks` + `setLightmapTextureCoords`/`setBrightness` lightmap path)        |
+| Date    | Check                                                                | Result                                                                                                                       |
+|---------|----------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| (today) | `RenderTileTank` (new TESR) created                                  | **DONE**                                                                                                                     |
+| (today) | `TileTank.shouldRenderInPass(0)` override added                      | **DONE**                                                                                                                     |
+| (today) | `ClientRegistry.bindTileEntitySpecialRenderer` in `ClientProxy.init` | **DONE**                                                                                                                     |
+| (today) | `./gradlew build`                                                    | **PASS** — BUILD SUCCESSFUL in 21s (`:compileJava`, `:checkstyleMain`, `:jar`, `:reobfJar`; Spotless applied)                |
+| (today) | `./gradlew runClient` (dev client launch)                            | **PASS** — requires manual launch (interactive GUI); agent shell cannot run an interactive Minecraft client                  |
+| (today) | In-game: water renders blue inside, level rises with fill            | **PASS** — manual                                                                                                            |
+| (today) | In-game: drain → level falls                                         | **PASS** — manual                                                                                                            |
+| (today) | In-game: lava → different color/icon                                 | **PASS** — manual                                                                                                            |
+| (today) | In-game: torch added/removed next to tank → fluid brightness tracks  | **PENDING** — manual (tests the `getLightBrightnessForSkyBlocks` + `setLightmapTextureCoords`/`setBrightness` lightmap path) |
 
 **Manual verification** (run `./gradlew runClient`):
 1. Place a tank, right-click with a water bucket to fill it → blue water should be visible inside the glass frame, rising with each bucket.
@@ -167,3 +167,25 @@
 **Dedicated-server gate:** not required for Phase 7 (client-only rendering; per plan section 4 the gate applies to sync/GUI phases 6 and 8).
 
 **Notes:** One verified API remap — 1.12.2 `Fluid.isLighterThanAir()` → 1.7.10 `Fluid.getDensity() < 0`. Fluid box geometry follows the 1.12.2 source (half-width 0.375 centered → x/z 0.125..0.875, y 0.125..0.125+0.75*fill), not the plan's approximate "0.375-0.625" summary. Lighting uses both `OpenGlHelper.setLightmapTextureCoords` (DoD) and `Tessellator.setBrightness` (per-vertex guarantee) — both produce identical (blockLight<<4, skyLight<<4) lightmap coords. See `docs/work-orders/RenderTileTank.md`.
+
+## Phase 7 — post-test fixes (3 findings from in-game test)
+
+User reported 3 findings after testing Phase 7. All investigated against decompiled 1.7.10 source + the 1.12.2 FluidDrawers / OpenBlocks references, then fixed. `./gradlew spotlessApply build` PASS (26s) after fixes.
+
+### Finding 1 — Luminous fluid should make the tank emit light
+- **Behavior wanted:** a tank filled with lava emits lava's light level (15).
+- **Source answer:** 1.12.2 `BlockTankBase` does NOT override `getLightValue` (tanks emit no light in FD 1.12.2). Per the user's fallback, referenced OpenBlocks: `BlockTank.getLightValue(IBlockAccess,x,y,z)` -> `tile.getFluidLightLevel()` -> `fluid.getLuminosity()` (unscaled by fill).
+- **Fix:** `BlockTank.getLightValue(IBlockAccess,x,y,z)` delegates to `TileTank.getFluidLightLevel()` (returns stored fluid's `getLuminosity()`, 0 when empty). `TileTank.onStoredFluidChanged` calls `worldObj.func_147451_t(x,y,z)` (runs `updateLightByType` Sky+Block, World:3268) only when the fluid luminosity actually changes — `markBlockForUpdate` alone does NOT relight (World:684-688 only notifies render accesses). Matches the OpenBlocks `TileEntityTank` relight-on-luminosity-change pattern.
+- **Decision:** luminosity is UNSCALED by fill (matches OpenBlocks). A nearly-empty lava tank still emits full 15. Revisit if a scaled version is preferred.
+- **Manual re-test:** fill with lava → tank + surroundings light up (level 15); drain → light removed; fill with water → no light change (luminosity 0).
+
+### Finding 2 — Rare GL leak (white bar flashed across screen during fill)
+- **Likely root cause:** the TESR enabled `GL_BLEND` unconditionally (even for opaque water/lava, alpha=1.0) and toggled `GL_CULL_FACE` off/on. For the common opaque case blend was unnecessary and added leak surface.
+- **Fix:** `RenderTileTank` now enables blend ONLY when `alpha < 1.0F` (translucent gaseous/lighter-than-air fluids); opaque fluids never touch blend. `GL_CULL_FACE` is no longer toggled (the fluid box is convex, so default back-face cull renders it correctly from every exterior angle). `GL_LIGHTING` disable/restore and the lightmap (`setLightmapTextureCoords` + per-vertex `setBrightness`) save/restore remain. Net: for the common opaque case only lighting + lightmap are touched (both restored) — minimal, symmetric state churn.
+- **Manual re-test:** fill/drain repeatedly (water + lava); watch for any white flash. (Was rare; may now be gone. If it recurs, the next suspect is the lightmap current-coord interaction with a later fullscreen pass.)
+
+### Finding 3 — Tank item glows near-white in complete darkness (hand + dropped + inventory)
+- **Root cause:** `BlockTankRenderer.renderInventoryBlock` hardcoded `tess.setBrightness(15728880)` (full-bright). `renderBlockAsItem` does NOT set brightness for the custom-render path (RenderBlocks:8361 dispatch is bare), so that hardcode OVERRODE the caller's lightmap — making the held item (whose caller, `ItemRenderer.renderItemInFirstPerson:287-290`, sets the lightmap to the player's AMBIENT light) glow full-bright regardless of darkness. In complete darkness the full-bright lightmap + the light metal texture read as near-white.
+- **Fix:** removed the hardcoded `setBrightness`. The item now inherits the caller's lightmap current coord: inventory slot -> `GuiContainer` sets `(240,240)` full-bright (GuiContainer:105-107, icon stays lit); held in hand -> ambient (dark at night); dropped entity -> ambient (dark at night). Per-face directional shading (`setColorOpaque_F` in `drawBox`) is preserved for the 3D look. Matches the OpenBlocks pattern (`BlockProjectorRenderer` / `ItemRendererTank` do not force item brightness).
+- **Manual re-test:** at night/in complete darkness, hold the tank + drop it → should be dark (not glowing white); in the inventory slot it should still be fully visible (lit). In daylight all three should look normal.
+

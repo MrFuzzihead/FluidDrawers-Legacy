@@ -35,6 +35,20 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
         return drawerGroup;
     }
 
+    /**
+     * The light level the tank block should emit, based on the stored fluid's luminosity. Unscaled
+     * by fill level -- matches the OpenBlocks Tank reference (which returns the fluid's luminosity
+     * directly); the 1.12.2 FluidDrawers source does not override getLightValue at all, so
+     * OpenBlocks is the authoritative reference here. Returns 0 when the tank is empty (no fluid
+     * set) or the stored fluid has no luminosity.
+     */
+    public int getFluidLightLevel() {
+        FluidStack fluid = drawerGroup.getFluidDrawer()
+            .getStoredFluid();
+        return fluid != null ? fluid.getFluid()
+            .getLuminosity(fluid) : 0;
+    }
+
     // --- FluidDrawerHost ---
 
     @Override
@@ -67,6 +81,19 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
         markDirty();
         if (worldObj != null) {
             worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
+            // If the fluid's luminosity changed, re-run the lighting engine at this position so a
+            // luminous fluid (e.g. lava) makes the tank emit light and draining it removes that
+            // light. markBlockForUpdate only notifies render accesses; it does NOT recalculate
+            // light. func_147451_t runs updateLightByType for both Sky and Block (World:3268).
+            // Matches the OpenBlocks TileEntityTank pattern: only relight when luminosity actually
+            // changes (avoids relight churn on every water bucket).
+            int oldLum = oldFluid != null ? oldFluid.getFluid()
+                .getLuminosity(oldFluid) : 0;
+            int newLum = newFluid != null ? newFluid.getFluid()
+                .getLuminosity(newFluid) : 0;
+            if (oldLum != newLum) {
+                worldObj.func_147451_t(xCoord, yCoord, zCoord);
+            }
         }
     }
 
