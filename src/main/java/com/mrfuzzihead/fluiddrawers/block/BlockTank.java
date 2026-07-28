@@ -136,8 +136,7 @@ public class BlockTank extends Block implements ITileEntityProvider {
             // TODO Phase 11: ItemPersonalKey → toggle ownership
             // Fluid transfer (Phase 5) — gated by facing != UP
 
-            if (side != 1 && !tile.getAttributes()
-                .isVoid() /* TODO Phase 11: && !tile.isSealed() */) {
+            if (side != 1 /* TODO Phase 11: && !tile.isSealed() */) {
                 if (BlockInteractionUtils
                     .transferFluid(tile, player, heldItem, ForgeDirection.getOrientation(side), true)) {
                     return true;
