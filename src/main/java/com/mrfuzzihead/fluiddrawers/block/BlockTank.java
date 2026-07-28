@@ -29,6 +29,9 @@ public class BlockTank extends Block implements ITileEntityProvider {
     private IIcon iconTank;
 
     @SideOnly(Side.CLIENT)
+    private IIcon iconTankVending;
+
+    @SideOnly(Side.CLIENT)
     private IIcon iconGlass;
 
     public BlockTank() {
@@ -124,25 +127,17 @@ public class BlockTank extends Block implements ITileEntityProvider {
 
         // TODO Phase 11: security-first guard — SecurityManager.hasAccess(player, tile)
 
-        // Capture the original held item ONCE, before any inventory changes happen on
-        // either client or server. Both sides operate on this same snapshot (the same
-        // pattern OpenBlocks uses in TileEntityTank.tryEmptyItem), so the server never
-        // mistakes a client-predicted swap for the actual held item.
+        // Capture the original held item ONCE.
         ItemStack heldItem = player.getHeldItem();
 
         if (heldItem != null) {
-            // Held-item dispatch:
             // TODO Phase 11: ItemKey/ModItems.tape → return false
-            // TODO Phase 9: ItemUpgrade → add upgrade
+            // TODO Phase 9: ItemUpgrade → add upgrade (handled by SlotDrawerUpgrade in GUI)
             // TODO Phase 11: ItemPersonalKey → toggle ownership
             // Fluid transfer (Phase 5) — gated by facing != UP
 
             if (side != 1 && !tile.getAttributes()
                 .isVoid() /* TODO Phase 11: && !tile.isSealed() */) {
-                // Both client and server run the same transferFluid with the original
-                // heldItem snapshot. The client-side TE modification is harmless (it gets
-                // overwritten by the next server → client TE sync), and the item swap
-                // is identical on both sides so the hotbar stays in sync immediately.
                 if (BlockInteractionUtils
                     .transferFluid(tile, player, heldItem, ForgeDirection.getOrientation(side), true)) {
                     return true;
@@ -160,12 +155,47 @@ public class BlockTank extends Block implements ITileEntityProvider {
         return false;
     }
 
+    // --- Redstone (Phase 10) ---
+
+    // Direct weak power on all sides when redstone upgrade is installed.
+    // Strong power on UP only. This is NOT a comparator override — it's direct
+    // power, matching FD 1.12.2 behavior.
+    // Matches the 1.12.2 func_180656_a (isProvidingWeakPower) and func_176211_b
+    // (isProvidingStrongPower) overrides in BlockTankBase.
+
+    @Override
+    public boolean canProvidePower() {
+        return true;
+    }
+
+    @Override
+    public int isProvidingWeakPower(IBlockAccess world, int x, int y, int z, int side) {
+        TileEntity tile = world.getTileEntity(x, y, z);
+        if (tile instanceof TileTank) {
+            TileTank tank = (TileTank) tile;
+            return tank.hasLevelEmitter() ? tank.getRedstoneLevel() : 0;
+        }
+        return 0;
+    }
+
+    @Override
+    public int isProvidingStrongPower(IBlockAccess world, int x, int y, int z, int side) {
+        // Strong power only on UP side (side 1 = bottom face = ForgeDirection.DOWN = meta 0)
+        // ForgeDirection ordinals: DOWN=0, UP=1, NORTH=2, SOUTH=3, WEST=4, EAST=5
+        // Block.isProvidingStrongPower side param matches ForgeDirection ordinal
+        if (side == 1) { // UP = the bottom face is being queried for power going upward
+            return isProvidingWeakPower(world, x, y, z, side);
+        }
+        return 0;
+    }
+
     // --- icons ---
 
     @Override
     @SideOnly(Side.CLIENT)
     public void registerBlockIcons(IIconRegister reg) {
         this.iconTank = reg.registerIcon("fluiddrawers:tank");
+        this.iconTankVending = reg.registerIcon("fluiddrawers:tank_vending");
         // Vanilla glass block texture (1.12.2 model references "minecraft:blocks/glass").
         this.iconGlass = reg.registerIcon("minecraft:glass");
     }
@@ -179,6 +209,11 @@ public class BlockTank extends Block implements ITileEntityProvider {
     @SideOnly(Side.CLIENT)
     public IIcon getIconTank() {
         return iconTank;
+    }
+
+    @SideOnly(Side.CLIENT)
+    public IIcon getIconTankVending() {
+        return iconTankVending;
     }
 
     @SideOnly(Side.CLIENT)

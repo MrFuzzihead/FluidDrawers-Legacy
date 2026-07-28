@@ -3,6 +3,7 @@ package com.mrfuzzihead.fluiddrawers.client.renderer;
 import net.minecraft.block.Block;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.IIcon;
 import net.minecraft.world.IBlockAccess;
 import net.minecraftforge.client.ForgeHooksClient;
@@ -11,6 +12,7 @@ import org.lwjgl.opengl.GL11;
 
 import com.mrfuzzihead.fluiddrawers.block.BlockTank;
 import com.mrfuzzihead.fluiddrawers.init.ModBlocks;
+import com.mrfuzzihead.fluiddrawers.tile.TileTank;
 
 import cpw.mods.fml.client.registry.ISimpleBlockRenderingHandler;
 
@@ -99,7 +101,11 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
             return true;
         }
 
-        IIcon iconTank = tank.getIconTank();
+        // Check the tile entity to see if vending upgrade is installed — if so,
+        // use the vending texture for the metal frame.
+        TileEntity te = world.getTileEntity(x, y, z);
+        IIcon iconTank = (te instanceof TileTank && ((TileTank) te).isVending()) ? tank.getIconTankVending()
+            : tank.getIconTank();
         IIcon iconGlass = tank.getIconGlass();
         Tessellator tess = Tessellator.instance;
 

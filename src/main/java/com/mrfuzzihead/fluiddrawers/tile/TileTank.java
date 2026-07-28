@@ -8,6 +8,7 @@ import net.minecraft.network.NetworkManager;
 import net.minecraft.network.Packet;
 import net.minecraft.network.play.server.S35PacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.MathHelper;
 import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidStack;
@@ -130,6 +131,41 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
     }
 
     /**
+     * Whether a redstone-level emitter upgrade is installed.
+     */
+    public boolean hasLevelEmitter() {
+        return upgradeData.hasLevelEmitter();
+    }
+
+    /**
+     * The current redstone signal strength (1-15) proportional to fill level.
+     * Returns 0 when empty.
+     */
+    public int getRedstoneLevel() {
+        if (!hasLevelEmitter()) {
+            return 0;
+        }
+        FluidStack fluid = drawerGroup.getFluidDrawer()
+            .getStoredFluid();
+        if (fluid == null || fluid.amount <= 0) {
+            return 0;
+        }
+        int capacity = drawerGroup.getFluidDrawer()
+            .getMaxCapacity();
+        if (capacity <= 0) {
+            return 0;
+        }
+        return MathHelper.clamp_int(1 + (int) (14 * fluid.amount / capacity), 1, 15);
+    }
+
+    /**
+     * Whether the tank has a creative vending upgrade installed.
+     */
+    public boolean isVending() {
+        return attributes.isUnlimitedVending();
+    }
+
+    /**
      * Notify the world that this block's state has changed.
      */
     public void notifyBlockUpdate() {
@@ -165,6 +201,12 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
                 .getLuminosity(newFluid) : 0;
             if (oldLum != newLum) {
                 worldObj.func_147451_t(xCoord, yCoord, zCoord);
+            }
+            // Phase 10: notify neighbors when redstone upgrade is installed so
+            // the redstone signal updates immediately on fill/drain.
+            if (hasLevelEmitter()) {
+                worldObj.notifyBlocksOfNeighborChange(xCoord, yCoord, zCoord, blockType);
+                worldObj.notifyBlocksOfNeighborChange(xCoord, yCoord - 1, zCoord, blockType);
             }
         }
     }
@@ -276,6 +318,62 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
 
         private final ItemStack[] upgradeSlots = new ItemStack[UPGRADE_SLOT_COUNT];
         private boolean downgraded = false;
+        private boolean redstoneEmitter = false;
+
+        /**
+         * Phase 10: Apply upgrade effects to the tank attributes by scanning
+         * all upgrade slots. Void, lock, creative/vending, and redstone upgrades
+         * set the corresponding attribute flags. Called after every change to
+         * the upgrade slots (setUpgrade, clearUpgrade, readFromNBT).
+         */
+        private void applyUpgradeEffects() {
+            boolean hasVoid = false;
+            boolean hasLockEmpty = false;
+            boolean hasLockPopulated = false;
+            boolean hasVending = false;
+            boolean hasRedstone = false;
+
+            for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
+                ItemStack stack = upgradeSlots[i];
+                if (stack == null) continue;
+                if (stack.getItem() instanceof com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeVoid) {
+                    hasVoid = true;
+                }
+                if (stack.getItem() instanceof com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeLock) {
+                    hasLockEmpty = true;
+                    hasLockPopulated = true;
+                }
+                if (stack.getItem() instanceof com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeCreative) {
+                    if (stack.getItemDamage() == 1) {
+                        hasVending = true;
+                    }
+                }
+                if (stack.getItem() instanceof com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeRedstone) {
+                    hasRedstone = true;
+                }
+            }
+
+            attributes.setVoid(hasVoid);
+            attributes.setItemLocked(
+                com.jaquadro.minecraft.storagedrawers.api.storage.attribute.LockAttribute.LOCK_EMPTY,
+                hasLockEmpty);
+            attributes.setItemLocked(
+                com.jaquadro.minecraft.storagedrawers.api.storage.attribute.LockAttribute.LOCK_POPULATED,
+                hasLockPopulated);
+            attributes.setUnlimitedVending(hasVending);
+            redstoneEmitter = hasRedstone;
+
+            if (worldObj != null && !worldObj.isRemote) {
+                worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
+                if (hasRedstone) {
+                    notifyNeighbors();
+                }
+            }
+        }
+
+        public boolean hasLevelEmitter() {
+            return redstoneEmitter;
+        }
 
         public boolean canAddUpgrade(ItemStack upgrade) {
             if (!DrawerUpgradable.isUpgradeItem(upgrade)) {
@@ -320,6 +418,7 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
                 upgradeSlots[slot] = stack;
             }
             updateDowngradeState();
+            applyUpgradeEffects();
             notifyBlockUpdate();
         }
 
@@ -328,6 +427,7 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
                 upgradeSlots[slot] = null;
             }
             updateDowngradeState();
+            applyUpgradeEffects();
             notifyBlockUpdate();
         }
 
@@ -386,6 +486,7 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
                 }
             }
             downgraded = tag.getBoolean("Downgraded");
+            applyUpgradeEffects();
         }
     }
 
