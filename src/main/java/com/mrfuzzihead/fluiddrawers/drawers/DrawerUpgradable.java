@@ -6,7 +6,6 @@ import com.jaquadro.minecraft.storagedrawers.StorageDrawers;
 import com.jaquadro.minecraft.storagedrawers.item.ItemUpgrade;
 import com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeCreative;
 import com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeDowngrade;
-import com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeLock;
 import com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeRedstone;
 import com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeStatus;
 import com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeVoid;
@@ -28,11 +27,14 @@ public class DrawerUpgradable {
      * <li>{@link ItemUpgrade} (storage upgrades, metadata = level)</li>
      * <li>{@link ItemUpgradeDowngrade} (capacity downgrade)</li>
      * <li>{@link ItemUpgradeVoid} (void upgrade)</li>
-     * <li>{@link ItemUpgradeLock} (lock upgrade)</li>
      * <li>{@link ItemUpgradeCreative} (creative store/vend)</li>
      * <li>{@link ItemUpgradeRedstone} (redstone combined/max/min)</li>
      * <li>{@link ItemUpgradeStatus} (status level 1/2/3)</li>
      * </ul>
+     * 
+     * Note: {@code ItemUpgradeLock} (the Drawer Key) is NOT included — it is a
+     * physical key used by right-clicking the block, not an upgrade-slot item.
+     * Lock behavior is handled via {@code onBlockActivated} interaction (Phase 11).
      */
     public static boolean isUpgradeItem(ItemStack stack) {
         if (stack == null) {
@@ -40,7 +42,6 @@ public class DrawerUpgradable {
         }
         return stack.getItem() instanceof ItemUpgrade || stack.getItem() instanceof ItemUpgradeDowngrade
             || stack.getItem() instanceof ItemUpgradeVoid
-            || stack.getItem() instanceof ItemUpgradeLock
             || stack.getItem() instanceof ItemUpgradeCreative
             || stack.getItem() instanceof ItemUpgradeRedstone
             || stack.getItem() instanceof ItemUpgradeStatus;

@@ -328,8 +328,6 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
          */
         private void applyUpgradeEffects() {
             boolean hasVoid = false;
-            boolean hasLockEmpty = false;
-            boolean hasLockPopulated = false;
             boolean hasVending = false;
             boolean hasRedstone = false;
 
@@ -338,10 +336,6 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
                 if (stack == null) continue;
                 if (stack.getItem() instanceof com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeVoid) {
                     hasVoid = true;
-                }
-                if (stack.getItem() instanceof com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeLock) {
-                    hasLockEmpty = true;
-                    hasLockPopulated = true;
                 }
                 if (stack.getItem() instanceof com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeCreative) {
                     if (stack.getItemDamage() == 1) {
@@ -354,12 +348,7 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
             }
 
             attributes.setVoid(hasVoid);
-            attributes.setItemLocked(
-                com.jaquadro.minecraft.storagedrawers.api.storage.attribute.LockAttribute.LOCK_EMPTY,
-                hasLockEmpty);
-            attributes.setItemLocked(
-                com.jaquadro.minecraft.storagedrawers.api.storage.attribute.LockAttribute.LOCK_POPULATED,
-                hasLockPopulated);
+            // Lock is handled via onBlockActivated interaction (Phase 11), not upgrade slots
             attributes.setUnlimitedVending(hasVending);
             redstoneEmitter = hasRedstone;
 
