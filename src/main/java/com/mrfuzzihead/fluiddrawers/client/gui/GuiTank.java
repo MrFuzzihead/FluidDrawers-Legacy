@@ -139,8 +139,10 @@ public class GuiTank extends GuiContainer {
 
     @Override
     protected void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
-        // Draw the container title
-        String title = I18n.format("fluiddrawers.container.tank");
+        // Draw the container title -- uses the tank's custom (anvil) name when set, otherwise the
+        // default lang key (Phase 12).
+        TileTank tank = this.containerTank.getTileTank();
+        String title = tank.hasCustomName() ? tank.getCustomName() : I18n.format("fluiddrawers.container.tank");
         this.fontRendererObj.drawString(title, 8, 6, 0x404040);
 
         // Draw the "Upgrades" label

@@ -3,6 +3,10 @@ Phase 7:
 
 Phase 10:
     - I haven't tested the upgrade overlay textures yet
+    - Status upgrades unusable
 
 Phase 11:
     - key overlays, tape overlay not applying, fine for now
+
+Phase 12:
+    - Fluid is not rendering when sealed and held in inventory

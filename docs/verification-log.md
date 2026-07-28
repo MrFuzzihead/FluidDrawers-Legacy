@@ -203,3 +203,31 @@ User reported 3 findings after testing Phase 7. All investigated against decompi
 | (today) | `CommonProxy.java` modified (FdGuis.init() in init()) | **DONE** (registered via `NetworkRegistry.INSTANCE.registerGuiHandler`)                                                      |
 | (today) | `FluidDrawers.java` modified (@Mod.Instance field)    | **DONE** (instance field for GUI handler registration + player.openGui target)                                               |
 | (today) | `./gradlew build`                                     | **PASS** (BUILD SUCCESSFUL, spotless + compile + reobf)                                                                      |
+
+## Phase 12 - Item-block NBT persistence + custom name
+
+| Date    | Check                                                  | Result                                                                                                                              |
+|---------|--------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| (today) | `ItemBlockTank.java` created (NEW)                     | **DONE** (placeBlockAt restores "Tile" portable NBT -> readFromPortableNBT + setIsSealed(false); addInformation tooltip: capacity + sealed + fluid + upgrades + lock) |
+| (today) | `TileTank.java` modified (portable NBT + custom name)  | **DONE** (writeToNBT/readFromNBT delegate to writeToPortableNBT/readFromPortableNBT (no super -> excludes id/coords); customName field + getCustomName/setCustomName/hasCustomName; CustomName in portable NBT) |
+| (today) | `BlockTank.java` modified (break/drop/harvest)         | **DONE** (removedByPlayer(willHarvest) defers removal; harvestBlock -> super + setBlockToAir; getDrops: sealed -> "Tile" NBT + custom name on display tag, non-sealed -> clean-slate; breakBlock: non-sealed drops upgrades via dropBlockAsItem, skips creative upgrades) |
+| (today) | `ModBlocks.java` modified (registerBlock with ItemBlockTank) | **DONE** (GameRegistry.registerBlock(TANK, ItemBlockTank.class, "tank"))                                                      |
+| (today) | `GuiTank.java` modified (custom name title)            | **DONE** (title uses tank.getCustomName() when hasCustomName(), else lang key)                                                      |
+| (today) | `en_US.lang` modified (tooltip keys)                   | **DONE** (fluiddrawers.tooltip.fluid + fluiddrawers.tooltip.locked)                                                                 |
+| (today) | `./gradlew build`                                      | **PASS** (BUILD SUCCESSFUL, zero compile errors, spotless check passes)                                                             |
+| (today) | `./gradlew runClient` (startup)                        | **PASS** (client launched, FML loading took 13.158s, sound engine started, no crash reports)                                        |
+| (today) | Dedicated-server gate                                  | **N/A** (no new sync/proxy/packet code; GuiTank title change reads already-synced TE state; ItemBlockTank.addInformation is @SideOnly(CLIENT) which is correct) |
+
+### Phase 12 behavior checks (require manual in-game verification)
+
+1. **Sealed break preserves contents**: Fill tank + add upgrades + apply lock key + tape seal -> break -> item tooltip shows "Sealed" + fluid name/amount/effective-capacity + each upgrade + "Locked". *(PENDING manual test)*
+2. **Sealed place restores + unseals**: Place the sealed item -> fluid + upgrades + lock restored, tank no longer sealed (can fill/drain/open GUI). *(PENDING manual test)*
+3. **Non-sealed break destroys fluid + drops upgrades**: Fill tank + add upgrades (no seal) -> break -> fluid destroyed (clean-slate item), upgrades dropped on ground (creative upgrades NOT dropped), item has no "Tile" NBT. *(PENDING manual test)*
+4. **Anvil rename**: Rename tank item in anvil -> place -> GUI title shows custom name; break -> item shows custom name in inventory. *(PENDING manual test)*
+
+### Key design decisions
+
+- **Portable NBT split**: `writeToNBT`/`readFromNBT` now delegate to `writeToPortableNBT`/`readFromPortableNBT` (no `super` inside portable methods). This excludes the TE id/coordinates so restoring an item doesn't overwrite the new TE's position. Matches SD 1.7.10 `BaseTileEntity` pattern.
+- **1.7.10 harvest lifecycle**: `removedByPlayer(willHarvest=true)` returns true WITHOUT removing the block, so `getDrops` (called from `harvestBlock` -> `super.harvestBlock`) can read the still-present TE. `harvestBlock` then calls `setBlockToAir` -> `breakBlock` (drops upgrades for non-sealed) -> `removeTileEntity`. Matches SD 1.7.10 `BlockDrawers`.
+- **Sealed vs non-sealed break**: Sealed -> write "Tile" portable NBT (preserves fluid + upgrades + key statuses + custom name); non-sealed -> clean-slate item (fluid destroyed, upgrades dropped separately in breakBlock). Custom name always travels on the item display tag.
+- **keepContentsOnBreak**: Deferred (not in user's requirement for this phase). The 1.12.2 code checks `StorageDrawers.config.cache.keepContentsOnBreak` but the user's spec is sealed-only preservation + non-sealed destroy. Implemented per user's requirement.

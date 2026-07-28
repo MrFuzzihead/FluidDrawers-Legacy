@@ -44,6 +44,10 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
     private UUID owner = null;
     private String securityKey = null;
 
+    // Phase 12: custom (anvil) name -- the 1.7.10 equivalent of 1.12.2 IWorldNameable/CustomNameData,
+    // inlined since SD 1.7.10 has no separate CustomNameData class.
+    private String customName = null;
+
     public static final int UPGRADE_SLOT_COUNT = 7;
 
     public TileTank() {
@@ -107,6 +111,21 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
 
     public SingletonFluidDrawerGroup getDrawerGroup() {
         return drawerGroup;
+    }
+
+    // --- Custom name (Phase 12) ---
+
+    public String getCustomName() {
+        return this.customName;
+    }
+
+    public void setCustomName(String name) {
+        this.customName = (name != null && name.length() > 0) ? name : null;
+        markDirty();
+    }
+
+    public boolean hasCustomName() {
+        return this.customName != null && this.customName.length() > 0;
     }
 
     /**
@@ -322,6 +341,24 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
     @Override
     public void writeToNBT(NBTTagCompound tag) {
         super.writeToNBT(tag);
+        writeToPortableNBT(tag);
+    }
+
+    @Override
+    public void readFromNBT(NBTTagCompound tag) {
+        super.readFromNBT(tag);
+        readFromPortableNBT(tag);
+    }
+
+    /**
+     * Writes the tank's "portable" state -- everything that should travel with the item when the
+     * block is broken while sealed: fluid, attributes (lock/key statuses), upgrades, seal, owner,
+     * security key, and custom name. Excludes the TileEntity id/coordinates written by
+     * {@link #writeToNBT}, so restoring an item via {@link #readFromPortableNBT} does not overwrite
+     * the freshly-placed tile's position. Ports the 1.12.2 {@code writeToPortableNBT} / SD 1.7.10
+     * {@code BaseTileEntity} portable-NBT split.
+     */
+    public void writeToPortableNBT(NBTTagCompound tag) {
         this.drawerGroup.writeToNBT(tag);
         tag.setTag("Attributes", this.attributes.serializeNBT());
         this.upgradeData.writeToNBT(tag);
@@ -332,17 +369,19 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
         if (this.securityKey != null) {
             tag.setString("SecKey", this.securityKey);
         }
+        if (this.customName != null && this.customName.length() > 0) {
+            tag.setString("CustomName", this.customName);
+        }
     }
 
-    @Override
-    public void readFromNBT(NBTTagCompound tag) {
-        super.readFromNBT(tag);
+    public void readFromPortableNBT(NBTTagCompound tag) {
         this.drawerGroup.readFromNBT(tag);
         this.attributes.deserializeNBT(tag.getCompoundTag("Attributes"));
         this.upgradeData.readFromNBT(tag);
         this.sealed = tag.getBoolean("Sealed");
         this.owner = tag.hasKey("Owner") ? UUID.fromString(tag.getString("Owner")) : null;
         this.securityKey = tag.hasKey("SecKey") ? tag.getString("SecKey") : null;
+        this.customName = tag.hasKey("CustomName") ? tag.getString("CustomName") : null;
     }
 
     // --- Sync (description packet) ---

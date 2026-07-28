@@ -150,31 +150,31 @@ Each phase must pass **all** the following to be considered done:
 - [x] GUI-title lang key added.
 
 ### Phase 9 DoD
-- [ ] UpgradeItemHandler as IInventory (7 slots).
-- [ ] `canAddUpgrade`/`canRemoveUpgrade` with capacity checks.
-- [ ] SD 1.7.10 item remap working: ModItems.upgrade (metadata = level), ModItems.upgradeDowngrade.
-- [ ] Capacity updates on storage upgrade install/removal.
-- [ ] `upgradeConversion`/`upgradeOneStack` checks from 1.12.2 source dropped.
+- [x] UpgradeItemHandler as IInventory (7 slots).
+- [x] `canAddUpgrade`/`canRemoveUpgrade` with capacity checks.
+- [x] SD 1.7.10 item remap working: ModItems.upgrade (metadata = level), ModItems.upgradeDowngrade.
+- [x] Capacity updates on storage upgrade install/removal.
+- [x] `upgradeConversion`/`upgradeOneStack` checks from 1.12.2 source dropped.
 
 ### Phase 10 DoD
-- [ ] Void upgrade → excess overflow voided.
-- [ ] Redstone upgrade → `canProvidePower()=true`; `isProvidingWeakPower` = getRedstoneLevel on all sides; `isProvidingStrongPower` = UP only.
-- [ ] getRedstoneLevel = clamp(1+floor(14*amt/cap), 1, 15) (0 when empty).
-- [ ] markDirty → notifyNeighbors when level emitter present.
-- [ ] Lock upgrade → LockAttribute honored (fluid retained on drain to 0).
-- [ ] Creative upgrade → unlimited vending + tank_vending.png via markBlockForUpdate.
+- [x] Void upgrade → excess overflow voided.
+- [x] Redstone upgrade → `canProvidePower()=true`; `isProvidingWeakPower` = getRedstoneLevel on all sides; `isProvidingStrongPower` = UP only.
+- [x] getRedstoneLevel = clamp(1+floor(14*amt/cap), 1, 15) (0 when empty).
+- [x] markDirty → notifyNeighbors when level emitter present.
+- [x] Lock upgrade → LockAttribute honored (fluid retained on drain to 0).
+- [x] Creative upgrade → unlimited vending + tank_vending.png via markBlockForUpdate.
 
 ### Phase 11 DoD
-- [ ] Tape seals (ItemTape.onItemUse). Unseals via sneak+empty-hand in dispatcher.
+- [x] Tape seals (ItemTape.onItemUse). Unseals via sneak+empty-hand in dispatcher.
 - [ ] Personal key sets/clears owner. Security-first guard blocks non-owners.
 - [ ] Seal/lock/void overlays render (via block renderer or TESR) with markBlockForUpdate.
-- [ ] keepContentsOnBreak honored when sealed.
+- [x] keepContentsOnBreak honored when sealed.
 - [ ] Seal/ownership message lang keys.
 
 ### Phase 12 DoD
-- [ ] ItemBlockTank reads "Tile" NBT on place, restores TE.
-- [ ] getDrops/getDroppedDrawerItem writes TE NBT into item when sealed or keepContentsOnBreak.
-- [ ] Custom name via IWorldNameable.
+- [x] ItemBlockTank reads "Tile" NBT on place, restores TE.
+- [x] getDrops/getDroppedDrawerItem writes TE NBT into item when sealed or keepContentsOnBreak.
+- [x] Custom name via IWorldNameable.
 
 ### Phase 13 DoD
 - [ ] GameRegistry.addShapedRecipe for the tank.

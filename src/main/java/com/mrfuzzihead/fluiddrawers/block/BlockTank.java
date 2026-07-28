@@ -1,11 +1,15 @@
 package com.mrfuzzihead.fluiddrawers.block;
 
+import java.util.ArrayList;
+
 import net.minecraft.block.Block;
 import net.minecraft.block.ITileEntityProvider;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.IIcon;
 import net.minecraft.world.IBlockAccess;
@@ -17,6 +21,7 @@ import com.jaquadro.minecraft.storagedrawers.StorageDrawers;
 import com.jaquadro.minecraft.storagedrawers.api.storage.attribute.LockAttribute;
 import com.jaquadro.minecraft.storagedrawers.core.ModItems;
 import com.jaquadro.minecraft.storagedrawers.item.ItemPersonalKey;
+import com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeCreative;
 import com.jaquadro.minecraft.storagedrawers.security.SecurityManager;
 import com.mrfuzzihead.fluiddrawers.FluidDrawers;
 import com.mrfuzzihead.fluiddrawers.FluidDrawersCreativeTab;
@@ -106,8 +111,71 @@ public class BlockTank extends Block implements ITileEntityProvider {
 
     @Override
     public void breakBlock(World world, int x, int y, int z, Block block, int meta) {
+        TileTank tile = (TileTank) world.getTileEntity(x, y, z);
+        if (tile != null && !tile.isSealed()) {
+            // Non-sealed break: drop installed upgrades on the ground (skip creative upgrades,
+            // matching SD 1.7.10 BlockDrawers.breakBlock). Fluid is NOT preserved -- it is
+            // destroyed (no "Tile" NBT written in getDrops). This implements the requirement that
+            // a non-sealed break returns a clean-slate tank.
+            for (int i = 0; i < TileTank.UPGRADE_SLOT_COUNT; i++) {
+                ItemStack stack = tile.getUpgradeInventory()
+                    .getStackInSlot(i);
+                if (stack != null) {
+                    if (stack.getItem() instanceof ItemUpgradeCreative) continue;
+                    dropBlockAsItem(world, x, y, z, stack);
+                }
+            }
+            world.func_147453_f(x, y, z, block);
+        }
         super.breakBlock(world, x, y, z, block, meta);
         world.removeTileEntity(x, y, z);
+    }
+
+    // --- Phase 12: break/drop/harvest coordination ---
+    // 1.7.10 survival harvest calls removeBlock (-> setBlockToAir -> breakBlock -> removeTE)
+    // BEFORE harvestBlock -> getDrops, so getDrops would see a null TE. Deferring removal via
+    // removedByPlayer(willHarvest) + harvestBlock (matching SD 1.7.10 BlockDrawers) keeps the
+    // block + TE alive until getDrops has read the portable NBT, then cleans up.
+
+    @Override
+    public boolean removedByPlayer(World world, EntityPlayer player, int x, int y, int z, boolean willHarvest) {
+        if (willHarvest) return true;
+        return super.removedByPlayer(world, player, x, y, z, willHarvest);
+    }
+
+    @Override
+    public void harvestBlock(World world, EntityPlayer player, int x, int y, int z, int meta) {
+        super.harvestBlock(world, player, x, y, z, meta);
+        world.setBlockToAir(x, y, z);
+    }
+
+    @Override
+    public ArrayList<ItemStack> getDrops(World world, int x, int y, int z, int metadata, int fortune) {
+        ArrayList<ItemStack> drops = new ArrayList<ItemStack>();
+        ItemStack dropStack = new ItemStack(Item.getItemFromBlock(this), 1, metadata);
+        TileTank tile = (TileTank) world.getTileEntity(x, y, z);
+        if (tile != null) {
+            // Sealed tank -> preserve all contents (fluid, upgrades, key statuses, custom name)
+            // in the item's "Tile" portable NBT. Non-sealed -> clean-slate item (fluid destroyed,
+            // upgrades dropped separately in breakBlock). Implements the requirement: sealed break
+            // preserves; non-sealed break destroys fluid + drops upgrades + clean-slate item.
+            if (tile.isSealed()) {
+                NBTTagCompound tiledata = new NBTTagCompound();
+                tile.writeToPortableNBT(tiledata);
+                NBTTagCompound data = dropStack.getTagCompound();
+                if (data == null) data = new NBTTagCompound();
+                data.setTag("Tile", tiledata);
+                dropStack.setTagCompound(data);
+            }
+            // Custom name travels on the item's display tag (visible in inventory) regardless of
+            // sealed state -- it is the tank's identity, not its contents. It is also inside the
+            // "Tile" portable NBT for restoration on place when sealed.
+            if (tile.hasCustomName()) {
+                dropStack.setStackDisplayName(tile.getCustomName());
+            }
+        }
+        drops.add(dropStack);
+        return drops;
     }
 
     @Override

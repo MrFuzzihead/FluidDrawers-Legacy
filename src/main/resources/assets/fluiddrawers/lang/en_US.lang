@@ -24,3 +24,7 @@ fluiddrawers.msg.owner_cleared=Owner cleared
 fluiddrawers.msg.locked=Tank locked
 fluiddrawers.msg.unlocked=Tank unlocked
 
+# Item tooltip (Phase 12)
+fluiddrawers.tooltip.fluid=%s: %s / %s mB
+fluiddrawers.tooltip.locked=Locked
+

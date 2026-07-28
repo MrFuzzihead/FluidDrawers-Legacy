@@ -1,6 +1,7 @@
 package com.mrfuzzihead.fluiddrawers.init;
 
 import com.mrfuzzihead.fluiddrawers.block.BlockTank;
+import com.mrfuzzihead.fluiddrawers.item.block.ItemBlockTank;
 
 import cpw.mods.fml.common.registry.GameRegistry;
 
@@ -14,6 +15,7 @@ public class ModBlocks {
 
     public static void init() {
         TANK = new BlockTank();
-        GameRegistry.registerBlock(TANK, "tank");
+        // Register with our custom ItemBlockTank (Phase 12) so break/place preserves NBT.
+        GameRegistry.registerBlock(TANK, ItemBlockTank.class, "tank");
     }
 }
