@@ -1,5 +1,7 @@
 package com.mrfuzzihead.fluiddrawers.tile;
 
+import java.util.UUID;
+
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
@@ -15,6 +17,10 @@ import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidTankInfo;
 import net.minecraftforge.fluids.IFluidHandler;
 
+import com.jaquadro.minecraft.storagedrawers.StorageDrawers;
+import com.jaquadro.minecraft.storagedrawers.api.security.ISecurityProvider;
+import com.jaquadro.minecraft.storagedrawers.api.storage.attribute.IProtectable;
+import com.jaquadro.minecraft.storagedrawers.api.storage.attribute.ISealable;
 import com.mrfuzzihead.fluiddrawers.Config;
 import com.mrfuzzihead.fluiddrawers.drawers.DrawerUpgradable;
 import com.mrfuzzihead.fluiddrawers.drawers.FluidDrawerGroup;
@@ -26,12 +32,17 @@ import com.mrfuzzihead.fluiddrawers.util.SimpleDrawerAttributes;
  * Tile entity for the Fluid Tank. Acts as the 1.7.10 {@link IFluidHandler} for bucket
  * interaction, delegating to the internal {@link SingletonFluidDrawerGroup}.
  */
-public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandler {
+public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandler, ISealable, IProtectable {
 
     private final SingletonFluidDrawerGroup drawerGroup;
     private final TankAttributes attributes;
     private final UpgradeInventory upgradeInventory;
     private final TankUpgradeData upgradeData;
+
+    // Phase 11: seal & security state
+    private boolean sealed = false;
+    private UUID owner = null;
+    private String securityKey = null;
 
     public static final int UPGRADE_SLOT_COUNT = 7;
 
@@ -40,6 +51,58 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
         this.drawerGroup = new SingletonFluidDrawerGroup(this);
         this.upgradeInventory = new UpgradeInventory();
         this.upgradeData = new TankUpgradeData();
+    }
+
+    // --- ISealable ---
+
+    @Override
+    public boolean isSealed() {
+        return sealed && StorageDrawers.config.cache.enableTape;
+    }
+
+    @Override
+    public boolean setIsSealed(boolean state) {
+        if (!StorageDrawers.config.cache.enableTape) return false;
+        if (this.sealed != state) {
+            this.sealed = state;
+            if (worldObj != null && !worldObj.isRemote) {
+                markDirty();
+                worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
+            }
+        }
+        return true;
+    }
+
+    // --- IProtectable ---
+
+    @Override
+    public UUID getOwner() {
+        if (!StorageDrawers.config.cache.enablePersonalUpgrades) return null;
+        return owner;
+    }
+
+    @Override
+    public boolean setOwner(UUID owner) {
+        if (!StorageDrawers.config.cache.enablePersonalUpgrades) return false;
+        if ((this.owner != null && !this.owner.equals(owner)) || (owner != null && !owner.equals(this.owner))) {
+            this.owner = owner;
+            if (worldObj != null && !worldObj.isRemote) {
+                markDirty();
+                worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public ISecurityProvider getSecurityProvider() {
+        // Using default provider (strict owner access)
+        return null;
+    }
+
+    @Override
+    public boolean setSecurityProvider(ISecurityProvider provider) {
+        return false;
     }
 
     public SingletonFluidDrawerGroup getDrawerGroup() {
@@ -262,6 +325,13 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
         this.drawerGroup.writeToNBT(tag);
         tag.setTag("Attributes", this.attributes.serializeNBT());
         this.upgradeData.writeToNBT(tag);
+        tag.setBoolean("Sealed", this.sealed);
+        if (this.owner != null) {
+            tag.setString("Owner", this.owner.toString());
+        }
+        if (this.securityKey != null) {
+            tag.setString("SecKey", this.securityKey);
+        }
     }
 
     @Override
@@ -270,6 +340,9 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
         this.drawerGroup.readFromNBT(tag);
         this.attributes.deserializeNBT(tag.getCompoundTag("Attributes"));
         this.upgradeData.readFromNBT(tag);
+        this.sealed = tag.getBoolean("Sealed");
+        this.owner = tag.hasKey("Owner") ? UUID.fromString(tag.getString("Owner")) : null;
+        this.securityKey = tag.hasKey("SecKey") ? tag.getString("SecKey") : null;
     }
 
     // --- Sync (description packet) ---

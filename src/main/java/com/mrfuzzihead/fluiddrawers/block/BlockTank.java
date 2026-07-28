@@ -11,10 +11,16 @@ import net.minecraft.util.IIcon;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
+import net.minecraftforge.fluids.FluidStack;
 
 import com.jaquadro.minecraft.storagedrawers.StorageDrawers;
+import com.jaquadro.minecraft.storagedrawers.api.storage.attribute.LockAttribute;
+import com.jaquadro.minecraft.storagedrawers.core.ModItems;
+import com.jaquadro.minecraft.storagedrawers.item.ItemPersonalKey;
+import com.jaquadro.minecraft.storagedrawers.security.SecurityManager;
 import com.mrfuzzihead.fluiddrawers.FluidDrawers;
 import com.mrfuzzihead.fluiddrawers.FluidDrawersCreativeTab;
+import com.mrfuzzihead.fluiddrawers.drawers.FluidDrawer;
 import com.mrfuzzihead.fluiddrawers.init.FdGuis;
 import com.mrfuzzihead.fluiddrawers.init.ModBlocks;
 import com.mrfuzzihead.fluiddrawers.tile.TileTank;
@@ -125,18 +131,59 @@ public class BlockTank extends Block implements ITileEntityProvider {
         TileTank tile = (TileTank) world.getTileEntity(x, y, z);
         if (tile == null) return false;
 
-        // TODO Phase 11: security-first guard — SecurityManager.hasAccess(player, tile)
+        // Security-first guard: non-owners are blocked before any interaction
+        if (!SecurityManager.hasAccess(player.getGameProfile(), tile)) {
+            return false;
+        }
 
         // Capture the original held item ONCE.
         ItemStack heldItem = player.getHeldItem();
 
         if (heldItem != null) {
-            // TODO Phase 11: ItemKey/ModItems.tape → return false
-            // TODO Phase 9: ItemUpgrade → add upgrade (handled by SlotDrawerUpgrade in GUI)
-            // TODO Phase 11: ItemPersonalKey → toggle ownership
-            // Fluid transfer (Phase 5) — gated by facing != UP
-
-            if (side != 1 /* TODO Phase 11: && !tile.isSealed() */) {
+            // Held-item dispatch:
+            // Tape: return false so ItemTape.onItemUse handles sealing
+            if (heldItem.getItem() == ModItems.tape) {
+                return false;
+            }
+            // Lock key: toggle lock attributes (SD 1.7.10 pattern: clear zero-amount
+            // prototype on unlock so a different fluid can be inserted afterwards)
+            if (heldItem.getItem() == ModItems.upgradeLock) {
+                if (!world.isRemote) {
+                    boolean locked = tile.getAttributes()
+                        .isItemLocked(LockAttribute.LOCK_POPULATED);
+                    // Unlock first so setStoredFluid(null) can clear the zero-amount
+                    // prototype via the new branch in SimpleFluidDrawer
+                    tile.getAttributes()
+                        .setItemLocked(LockAttribute.LOCK_EMPTY, !locked);
+                    tile.getAttributes()
+                        .setItemLocked(LockAttribute.LOCK_POPULATED, !locked);
+                    if (locked) {
+                        FluidDrawer drawer = tile.getDrawerGroup()
+                            .getFluidDrawer();
+                        FluidStack stored = drawer.getStoredFluid();
+                        if (stored != null && stored.amount <= 0) {
+                            drawer.setStoredFluid(null);
+                        }
+                    }
+                    world.markBlockForUpdate(x, y, z);
+                }
+                return true;
+            }
+            // Personal key: toggle ownership
+            if (heldItem.getItem() instanceof ItemPersonalKey) {
+                if (!world.isRemote) {
+                    if (tile.getOwner() == null) {
+                        tile.setOwner(player.getPersistentID());
+                    } else if (SecurityManager.hasOwnership(player.getGameProfile(), tile)) {
+                        tile.setOwner(null);
+                    } else {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            // Fluid transfer — gated by facing != UP and !sealed
+            if (side != 1 && !tile.isSealed()) {
                 if (BlockInteractionUtils
                     .transferFluid(tile, player, heldItem, ForgeDirection.getOrientation(side), true)) {
                     return true;
@@ -144,7 +191,14 @@ public class BlockTank extends Block implements ITileEntityProvider {
             }
         } else if (player.isSneaking()) {
             // Empty hand + sneak:
-            // TODO Phase 11: if sealed → unseal
+            if (tile.isSealed()) {
+                if (!world.isRemote) {
+                    tile.setIsSealed(false);
+                    world.markBlockForUpdate(x, y, z);
+                }
+                return true;
+            }
+            // Not sealed → open GUI
             if (StorageDrawers.config.cache.enableDrawerUI) {
                 player.openGui(FluidDrawers.instance, FdGuis.GUI_TANK, world, x, y, z);
                 return true;

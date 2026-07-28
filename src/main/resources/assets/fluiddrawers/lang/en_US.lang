@@ -16,3 +16,11 @@ itemGroup.fluiddrawers=Fluid Drawers
 # Upgrade messages
 fluiddrawers.info.capacity_exceeded=Cannot remove upgrade: fluid exceeds new capacity
 
+# Seal & security messages (Phase 11)
+fluiddrawers.msg.sealed=Tank sealed
+fluiddrawers.msg.unsealed=Tank unsealed
+fluiddrawers.msg.owner_set=Owner set
+fluiddrawers.msg.owner_cleared=Owner cleared
+fluiddrawers.msg.locked=Tank locked
+fluiddrawers.msg.unlocked=Tank unlocked
+

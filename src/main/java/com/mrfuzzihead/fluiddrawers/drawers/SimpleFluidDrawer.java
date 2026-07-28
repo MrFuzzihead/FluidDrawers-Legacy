@@ -56,6 +56,12 @@ public class SimpleFluidDrawer implements FluidDrawer {
                 this.fluid = null;
             }
             this.host.onStoredFluidChanged(this.slot, oldFluid, this.fluid);
+        } else if (this.fluid != null && this.fluid.amount <= 0) {
+            // Zero-amount prototype left by lock-persisted drain: clear it.
+            // This is called externally (e.g. unlock toggling, see BlockTank).
+            FluidStack oldFluid = this.fluid;
+            this.fluid = null;
+            this.host.onStoredFluidChanged(this.slot, oldFluid, this.fluid);
         }
         return this;
     }

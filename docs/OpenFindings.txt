@@ -3,3 +3,6 @@ Phase 7:
 
 Phase 10:
     - I haven't tested the upgrade overlay textures yet
+
+Phase 11:
+    - key overlays, tape overlay not applying, fine for now
