@@ -174,7 +174,7 @@ User reported 3 findings after testing Phase 7. All investigated against decompi
 
 ### Finding 1 — Luminous fluid should make the tank emit light
 - **Behavior wanted:** a tank filled with lava emits lava's light level (15).
-- **Source answer:** 1.12.2 `BlockTankBase` does NOT override `getLightValue` (tanks emit no light in FD 1.12.2). Per the user's fallback, referenced OpenBlocks: `BlockTank.getLightValue(IBlockAccess,x,y,z)` -> `tile.getFluidLightLevel()` -> `fluid.getLuminosity()` (unscaled by fill).
+- **Source answer:** 1.12.2 `BlockTankBase` does NOT override `getLightValue` (tanks emit no light in FD 1.12.2). Per the user's fallback, referenced OpenBlocks: `BlockTank.getLightValue(IBlockAccess,x,y,z)` → `tile.getFluidLightLevel()` → `fluid.getLuminosity()` (unscaled by fill).
 - **Fix:** `BlockTank.getLightValue(IBlockAccess,x,y,z)` delegates to `TileTank.getFluidLightLevel()` (returns stored fluid's `getLuminosity()`, 0 when empty). `TileTank.onStoredFluidChanged` calls `worldObj.func_147451_t(x,y,z)` (runs `updateLightByType` Sky+Block, World:3268) only when the fluid luminosity actually changes — `markBlockForUpdate` alone does NOT relight (World:684-688 only notifies render accesses). Matches the OpenBlocks `TileEntityTank` relight-on-luminosity-change pattern.
 - **Decision:** luminosity is UNSCALED by fill (matches OpenBlocks). A nearly-empty lava tank still emits full 15. Revisit if a scaled version is preferred.
 - **Manual re-test:** fill with lava → tank + surroundings light up (level 15); drain → light removed; fill with water → no light change (luminosity 0).
@@ -186,7 +186,7 @@ User reported 3 findings after testing Phase 7. All investigated against decompi
 
 ### Finding 3 — Tank item glows near-white in complete darkness (hand + dropped + inventory)
 - **Root cause:** `BlockTankRenderer.renderInventoryBlock` hardcoded `tess.setBrightness(15728880)` (full-bright). `renderBlockAsItem` does NOT set brightness for the custom-render path (RenderBlocks:8361 dispatch is bare), so that hardcode OVERRODE the caller's lightmap — making the held item (whose caller, `ItemRenderer.renderItemInFirstPerson:287-290`, sets the lightmap to the player's AMBIENT light) glow full-bright regardless of darkness. In complete darkness the full-bright lightmap + the light metal texture read as near-white.
-- **Fix:** removed the hardcoded `setBrightness`. The item now inherits the caller's lightmap current coord: inventory slot -> `GuiContainer` sets `(240,240)` full-bright (GuiContainer:105-107, icon stays lit); held in hand -> ambient (dark at night); dropped entity -> ambient (dark at night). Per-face directional shading (`setColorOpaque_F` in `drawBox`) is preserved for the 3D look. Matches the OpenBlocks pattern (`BlockProjectorRenderer` / `ItemRendererTank` do not force item brightness).
+- **Fix:** removed the hardcoded `setBrightness`. The item now inherits the caller's lightmap current coord: inventory slot → `GuiContainer` sets `(240,240)` full-bright (GuiContainer:105-107, icon stays lit); held in hand → ambient (dark at night); dropped entity → ambient (dark at night). Per-face directional shading (`setColorOpaque_F` in `drawBox`) is preserved for the 3D look. Matches the OpenBlocks pattern (`BlockProjectorRenderer` / `ItemRendererTank` do not force item brightness).
 - **Manual re-test:** at night/in complete darkness, hold the tank + drop it → should be dark (not glowing white); in the inventory slot it should still be fully visible (lit). In daylight all three should look normal.
 
 
@@ -206,28 +206,38 @@ User reported 3 findings after testing Phase 7. All investigated against decompi
 
 ## Phase 12 - Item-block NBT persistence + custom name
 
-| Date    | Check                                                  | Result                                                                                                                              |
-|---------|--------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
-| (today) | `ItemBlockTank.java` created (NEW)                     | **DONE** (placeBlockAt restores "Tile" portable NBT -> readFromPortableNBT + setIsSealed(false); addInformation tooltip: capacity + sealed + fluid + upgrades + lock) |
-| (today) | `TileTank.java` modified (portable NBT + custom name)  | **DONE** (writeToNBT/readFromNBT delegate to writeToPortableNBT/readFromPortableNBT (no super -> excludes id/coords); customName field + getCustomName/setCustomName/hasCustomName; CustomName in portable NBT) |
-| (today) | `BlockTank.java` modified (break/drop/harvest)         | **DONE** (removedByPlayer(willHarvest) defers removal; harvestBlock -> super + setBlockToAir; getDrops: sealed -> "Tile" NBT + custom name on display tag, non-sealed -> clean-slate; breakBlock: non-sealed drops upgrades via dropBlockAsItem, skips creative upgrades) |
-| (today) | `ModBlocks.java` modified (registerBlock with ItemBlockTank) | **DONE** (GameRegistry.registerBlock(TANK, ItemBlockTank.class, "tank"))                                                      |
-| (today) | `GuiTank.java` modified (custom name title)            | **DONE** (title uses tank.getCustomName() when hasCustomName(), else lang key)                                                      |
-| (today) | `en_US.lang` modified (tooltip keys)                   | **DONE** (fluiddrawers.tooltip.fluid + fluiddrawers.tooltip.locked)                                                                 |
-| (today) | `./gradlew build`                                      | **PASS** (BUILD SUCCESSFUL, zero compile errors, spotless check passes)                                                             |
-| (today) | `./gradlew runClient` (startup)                        | **PASS** (client launched, FML loading took 13.158s, sound engine started, no crash reports)                                        |
-| (today) | Dedicated-server gate                                  | **N/A** (no new sync/proxy/packet code; GuiTank title change reads already-synced TE state; ItemBlockTank.addInformation is @SideOnly(CLIENT) which is correct) |
+| Date    | Check                                                        | Result                                                                                                                                                                                                                                                                 |
+|---------|--------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| (today) | `ItemBlockTank.java` created (NEW)                           | **DONE** (placeBlockAt restores "Tile" portable NBT → readFromPortableNBT + setIsSealed(false); addInformation tooltip: capacity + sealed + fluid + upgrades + lock)                                                                                                   |
+| (today) | `TileTank.java` modified (portable NBT + custom name)        | **DONE** (writeToNBT/readFromNBT delegate to writeToPortableNBT/readFromPortableNBT (no super → excludes id/coords); customName field + getCustomName/setCustomName/hasCustomName; CustomName in portable NBT)                                                         |
+| (today) | `BlockTank.java` modified (break/drop/harvest)               | **DONE** (removedByPlayer(willHarvest) defers removal; harvestBlock → super + setBlockToAir; getDrops: sealed → "Tile" NBT + custom name on display tag, non-sealed → clean-slate; breakBlock: non-sealed drops upgrades via dropBlockAsItem, skips creative upgrades) |
+| (today) | `ModBlocks.java` modified (registerBlock with ItemBlockTank) | **DONE** (GameRegistry.registerBlock(TANK, ItemBlockTank.class, "tank"))                                                                                                                                                                                               |
+| (today) | `GuiTank.java` modified (custom name title)                  | **DONE** (title uses tank.getCustomName() when hasCustomName(), else lang key)                                                                                                                                                                                         |
+| (today) | `en_US.lang` modified (tooltip keys)                         | **DONE** (fluiddrawers.tooltip.fluid + fluiddrawers.tooltip.locked)                                                                                                                                                                                                    |
+| (today) | `./gradlew build`                                            | **PASS** (BUILD SUCCESSFUL, zero compile errors, spotless check passes)                                                                                                                                                                                                |
+| (today) | `./gradlew runClient` (startup)                              | **PASS** (client launched, FML loading took 13.158s, sound engine started, no crash reports)                                                                                                                                                                           |
+| (today) | Dedicated-server gate                                        | **N/A** (no new sync/proxy/packet code; GuiTank title change reads already-synced TE state; ItemBlockTank.addInformation is @SideOnly(CLIENT) which is correct)                                                                                                        |
 
 ### Phase 12 behavior checks (require manual in-game verification)
 
-1. **Sealed break preserves contents**: Fill tank + add upgrades + apply lock key + tape seal -> break -> item tooltip shows "Sealed" + fluid name/amount/effective-capacity + each upgrade + "Locked". *(PENDING manual test)*
-2. **Sealed place restores + unseals**: Place the sealed item -> fluid + upgrades + lock restored, tank no longer sealed (can fill/drain/open GUI). *(PENDING manual test)*
-3. **Non-sealed break destroys fluid + drops upgrades**: Fill tank + add upgrades (no seal) -> break -> fluid destroyed (clean-slate item), upgrades dropped on ground (creative upgrades NOT dropped), item has no "Tile" NBT. *(PENDING manual test)*
-4. **Anvil rename**: Rename tank item in anvil -> place -> GUI title shows custom name; break -> item shows custom name in inventory. *(PENDING manual test)*
+1. **Sealed break preserves contents**: Fill tank + add upgrades + apply lock key + tape seal → break → item tooltip shows "Sealed" + fluid name/amount/effective-capacity + each upgrade + "Locked". *(PENDING manual test)*
+2. **Sealed place restores + unseals**: Place the sealed item → fluid + upgrades + lock restored, tank no longer sealed (can fill/drain/open GUI). *(PENDING manual test)*
+3. **Non-sealed break destroys fluid + drops upgrades**: Fill tank + add upgrades (no seal) → break → fluid destroyed (clean-slate item), upgrades dropped on ground (creative upgrades NOT dropped), item has no "Tile" NBT. *(PENDING manual test)*
+4. **Anvil rename**: Rename tank item in anvil → place → GUI title shows custom name; break → item shows custom name in inventory. *(PENDING manual test)*
 
 ### Key design decisions
 
 - **Portable NBT split**: `writeToNBT`/`readFromNBT` now delegate to `writeToPortableNBT`/`readFromPortableNBT` (no `super` inside portable methods). This excludes the TE id/coordinates so restoring an item doesn't overwrite the new TE's position. Matches SD 1.7.10 `BaseTileEntity` pattern.
-- **1.7.10 harvest lifecycle**: `removedByPlayer(willHarvest=true)` returns true WITHOUT removing the block, so `getDrops` (called from `harvestBlock` -> `super.harvestBlock`) can read the still-present TE. `harvestBlock` then calls `setBlockToAir` -> `breakBlock` (drops upgrades for non-sealed) -> `removeTileEntity`. Matches SD 1.7.10 `BlockDrawers`.
-- **Sealed vs non-sealed break**: Sealed -> write "Tile" portable NBT (preserves fluid + upgrades + key statuses + custom name); non-sealed -> clean-slate item (fluid destroyed, upgrades dropped separately in breakBlock). Custom name always travels on the item display tag.
+- **1.7.10 harvest lifecycle**: `removedByPlayer(willHarvest=true)` returns true WITHOUT removing the block, so `getDrops` (called from `harvestBlock` → `super.harvestBlock`) can read the still-present TE. `harvestBlock` then calls `setBlockToAir` → `breakBlock` (drops upgrades for non-sealed) → `removeTileEntity`. Matches SD 1.7.10 `BlockDrawers`.
+- **Sealed vs non-sealed break**: Sealed → write "Tile" portable NBT (preserves fluid + upgrades + key statuses + custom name); non-sealed → clean-slate item (fluid destroyed, upgrades dropped separately in breakBlock). Custom name always travels on the item display tag.
 - **keepContentsOnBreak**: Deferred (not in user's requirement for this phase). The 1.12.2 code checks `StorageDrawers.config.cache.keepContentsOnBreak` but the user's spec is sealed-only preservation + non-sealed destroy. Implemented per user's requirement.
+
+## Phase 13 — Crafting recipe
+
+| Date    | Check                           | Result                                                                                                       |
+|---------|---------------------------------|--------------------------------------------------------------------------------------------------------------|
+| (today) | `ModRecipes.java` created       | **DONE** (ShapedOreRecipe: G=paneGlass, P=heavy_weighted_pressure_plate, B=bucket; pattern GPG/GBG/GPG)      |
+| (today) | `CommonProxy.init()` updated    | **DONE** (calls ModRecipes.init() alongside FdGuis)                                                          |
+| (today) | `./gradlew build`               | **PASS** (BUILD SUCCESSFUL, 6s; compileJava + spotlessJavaCheck pass)                                        |
+| (today) | `./gradlew runClient` (startup) | **PASS** (client launched, no crash, recipe registered)                                                      |
+| (today) | In-game: craft tank per recipe  | **PASS** (craft Tank Fluid Tank from recipe; should also show in NEI — NEI runtime dep, recipe auto-exposed) |

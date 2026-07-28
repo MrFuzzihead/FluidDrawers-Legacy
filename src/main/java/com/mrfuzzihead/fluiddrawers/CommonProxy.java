@@ -2,6 +2,7 @@ package com.mrfuzzihead.fluiddrawers;
 
 import com.mrfuzzihead.fluiddrawers.init.FdGuis;
 import com.mrfuzzihead.fluiddrawers.init.ModBlocks;
+import com.mrfuzzihead.fluiddrawers.init.ModRecipes;
 import com.mrfuzzihead.fluiddrawers.tile.TileTank;
 
 import cpw.mods.fml.common.event.FMLInitializationEvent;
@@ -24,6 +25,7 @@ public class CommonProxy {
 
     public void init(FMLInitializationEvent event) {
         FdGuis.init();
+        ModRecipes.init();
     }
 
     public void postInit(FMLPostInitializationEvent event) {}
