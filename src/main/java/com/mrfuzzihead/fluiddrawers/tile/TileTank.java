@@ -144,6 +144,17 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
         }
     }
 
+    // --- Render pass selection (Phase 7 TESR) ---
+
+    // Render the fluid TESR in the solid pass (0), behind the alpha-pass glass frame drawn by
+    // BlockTankRenderer (pass 1). TileEntity's default already returns pass == 0; this override
+    // makes the intent explicit and gives future phases (e.g. Phase 11 overlays) a clear place to
+    // opt into additional passes. The base method is not @SideOnly, so this is server-safe.
+    @Override
+    public boolean shouldRenderInPass(int pass) {
+        return pass == 0;
+    }
+
     // --- inner: TankAttributes ---
 
     private class TankAttributes extends SimpleDrawerAttributes {

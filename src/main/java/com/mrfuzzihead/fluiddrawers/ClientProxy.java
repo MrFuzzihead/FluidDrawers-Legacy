@@ -1,8 +1,11 @@
 package com.mrfuzzihead.fluiddrawers;
 
 import com.mrfuzzihead.fluiddrawers.client.renderer.BlockTankRenderer;
+import com.mrfuzzihead.fluiddrawers.client.tesr.RenderTileTank;
 import com.mrfuzzihead.fluiddrawers.init.ModBlocks;
+import com.mrfuzzihead.fluiddrawers.tile.TileTank;
 
+import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.client.registry.RenderingRegistry;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 
@@ -17,5 +20,8 @@ public class ClientProxy extends CommonProxy {
         // render time, so allocating the id here (init) is in time.
         ModBlocks.tankRenderId = RenderingRegistry.getNextAvailableRenderId();
         RenderingRegistry.registerBlockHandler(ModBlocks.tankRenderId, new BlockTankRenderer());
+
+        // Bind the fluid TESR (Phase 7) -- draws the stored fluid inside the glass frame.
+        ClientRegistry.bindTileEntitySpecialRenderer(TileTank.class, new RenderTileTank());
     }
 }

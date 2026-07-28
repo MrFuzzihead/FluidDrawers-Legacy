@@ -134,11 +134,13 @@ Each phase must pass **all** the following to be considered done:
 > **Status (2026-07-26):** Implemented + `./gradlew build` PASS (18s). Sync pattern matches SD 1.7.10 (`getDescriptionPacket` → `S35PacketUpdateTileEntity`; `onDataPacket` → `readFromNBT + markBlockForUpdate`). Manual in-game + dedicated-server gate pending.
 
 ### Phase 7 DoD
-- [ ] `RenderTileTank` is a 1.7.10 `TileEntitySpecialRenderer` using `Tessellator.startDrawingQuads`/`addVertexWithUV`/`draw`.
-- [ ] Uses `Fluid.getStillIcon()` for the sprite, `Fluid.getColor()` for tint.
-- [ ] Samples `world.getLightBrightnessForSkyBlocks(x,y,z, luminosity)` and applies via `OpenGlHelper.setLightmapTextureCoords`.
-- [ ] `ClientRegistry.bindTileEntitySpecialRenderer(TileTank.class, renderer)`.
-- [ ] `TileTank.shouldRenderInPass(0)` returns true.
+- [x] `RenderTileTank` is a 1.7.10 `TileEntitySpecialRenderer` using `Tessellator.startDrawingQuads`/`addVertexWithUV`/`draw`.
+- [x] Uses `Fluid.getStillIcon()` for the sprite, `Fluid.getColor()` for tint.
+- [x] Samples `world.getLightBrightnessForSkyBlocks(x,y,z, luminosity)` and applies via `OpenGlHelper.setLightmapTextureCoords` (+ `Tessellator.setBrightness` for per-vertex correctness).
+- [x] `ClientRegistry.bindTileEntitySpecialRenderer(TileTank.class, renderer)`.
+- [x] `TileTank.shouldRenderInPass(0)` returns true.
+
+> **Status (2026-07-26):** Implemented + `./gradlew build` PASS (21s; `:compileJava`/`:checkstyleMain`/`:jar`/`:reobfJar` clean; Spotless applied). One verified remap: 1.12.2 `Fluid.isLighterThanAir()` -> 1.7.10 `Fluid.getDensity() < 0` (no such method in 1.7.10; Fluid javadoc: "negative density indicates lighter than air"). All 1.7.10 APIs (Tessellator lightmap behavior, `getLightBrightnessForSkyBlocks` packing `(sky<<20)|(block<<4)`, `OpenGlHelper.setLightmapTextureCoords`, `Fluid.*`, `IIcon.*`, `TextureMap.locationBlocksTexture`, `TileEntity.shouldRenderInPass` not @SideOnly) verified against `build/rfg/minecraft-src`. **Manual in-game visual checks pending `./gradlew runClient`** (water/lava render, level tracks fill, torch-brightness tracks) -- see `docs/verification-log.md`. Phase 7 is client-only rendering; no dedicated-server gate (per plan section 4).
 
 ### Phase 8 DoD
 - [ ] `IGuiHandler` registered via `NetworkRegistry.registerGuiHandler`.

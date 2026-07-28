@@ -142,3 +142,28 @@
 1. Fill the tank with some water. Walk far enough that the chunk unloads, then walk back — the fluid should still be at the correct level (tests the `getDescriptionPacket`/`onDataPacket` sync path).
 2. Save & quit → reload → right-click with empty bucket → should still drain (confirms server-side NBT persistence).
 3. For the dedicated-server gate: run `./gradlew runServer`, then join from a client. Sync must work client→server→client with no class-side crash.
+
+## Phase 7 — Fluid TESR rendering
+
+| Date    | Check                                                                | Result                                                                                                                              |
+|---------|----------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| (today) | `RenderTileTank` (new TESR) created                                  | **DONE**                                                                                                                            |
+| (today) | `TileTank.shouldRenderInPass(0)` override added                      | **DONE**                                                                                                                            |
+| (today) | `ClientRegistry.bindTileEntitySpecialRenderer` in `ClientProxy.init` | **DONE**                                                                                                                            |
+| (today) | `./gradlew build`                                                    | **PASS** — BUILD SUCCESSFUL in 21s (`:compileJava`, `:checkstyleMain`, `:jar`, `:reobfJar`; Spotless applied)                       |
+| (today) | `./gradlew runClient` (dev client launch)                            | **PENDING** — requires manual launch (interactive GUI); agent shell cannot run an interactive Minecraft client                      |
+| (today) | In-game: water renders blue inside, level rises with fill            | **PENDING** — manual                                                                                                                |
+| (today) | In-game: drain → level falls                                         | **PENDING** — manual                                                                                                                |
+| (today) | In-game: lava → different color/icon                                 | **PENDING** — manual                                                                                                                |
+| (today) | In-game: torch added/removed next to tank → fluid brightness tracks  | **PENDING** — manual (tests the `getLightBrightnessForSkyBlocks` + `setLightmapTextureCoords`/`setBrightness` lightmap path)        |
+
+**Manual verification** (run `./gradlew runClient`):
+1. Place a tank, right-click with a water bucket to fill it → blue water should be visible inside the glass frame, rising with each bucket.
+2. Right-click with an empty bucket to drain → the fluid level should fall.
+3. Fill with lava (lava bucket) → the fluid should render with lava's color/icon and full-bright even in darkness (luminosity 15).
+4. Place a torch adjacent to the tank, then remove it → the fluid brightness should track the change (brighter with the torch, darker without). This confirms the lightmap path works (avoids the classic "fluid renders solid black" 1.7.10 bug).
+5. No crash on place/fill/drain/save/reload.
+
+**Dedicated-server gate:** not required for Phase 7 (client-only rendering; per plan section 4 the gate applies to sync/GUI phases 6 and 8).
+
+**Notes:** One verified API remap — 1.12.2 `Fluid.isLighterThanAir()` → 1.7.10 `Fluid.getDensity() < 0`. Fluid box geometry follows the 1.12.2 source (half-width 0.375 centered → x/z 0.125..0.875, y 0.125..0.125+0.75*fill), not the plan's approximate "0.375-0.625" summary. Lighting uses both `OpenGlHelper.setLightmapTextureCoords` (DoD) and `Tessellator.setBrightness` (per-vertex guarantee) — both produce identical (blockLight<<4, skyLight<<4) lightmap coords. See `docs/work-orders/RenderTileTank.md`.
