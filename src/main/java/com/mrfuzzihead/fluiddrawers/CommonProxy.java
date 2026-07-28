@@ -1,5 +1,6 @@
 package com.mrfuzzihead.fluiddrawers;
 
+import com.mrfuzzihead.fluiddrawers.init.FdGuis;
 import com.mrfuzzihead.fluiddrawers.init.ModBlocks;
 import com.mrfuzzihead.fluiddrawers.tile.TileTank;
 
@@ -21,7 +22,9 @@ public class CommonProxy {
         FluidDrawers.LOG.info("I am FluidDrawers at version " + Tags.VERSION);
     }
 
-    public void init(FMLInitializationEvent event) {}
+    public void init(FMLInitializationEvent event) {
+        FdGuis.init();
+    }
 
     public void postInit(FMLPostInitializationEvent event) {}
 

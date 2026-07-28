@@ -12,7 +12,10 @@ import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
+import com.jaquadro.minecraft.storagedrawers.StorageDrawers;
+import com.mrfuzzihead.fluiddrawers.FluidDrawers;
 import com.mrfuzzihead.fluiddrawers.FluidDrawersCreativeTab;
+import com.mrfuzzihead.fluiddrawers.init.FdGuis;
 import com.mrfuzzihead.fluiddrawers.init.ModBlocks;
 import com.mrfuzzihead.fluiddrawers.tile.TileTank;
 import com.mrfuzzihead.fluiddrawers.util.BlockInteractionUtils;
@@ -148,7 +151,10 @@ public class BlockTank extends Block implements ITileEntityProvider {
         } else if (player.isSneaking()) {
             // Empty hand + sneak:
             // TODO Phase 11: if sealed → unseal
-            // TODO Phase 8: else if enableDrawerUI → open GUI
+            if (StorageDrawers.config.cache.enableDrawerUI) {
+                player.openGui(FluidDrawers.instance, FdGuis.GUI_TANK, world, x, y, z);
+                return true;
+            }
         }
 
         return false;

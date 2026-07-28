@@ -1,5 +1,8 @@
 package com.mrfuzzihead.fluiddrawers.tile;
 
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.inventory.IInventory;
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.NetworkManager;
 import net.minecraft.network.Packet;
@@ -25,10 +28,14 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
 
     private final SingletonFluidDrawerGroup drawerGroup;
     private final TankAttributes attributes;
+    private final UpgradeInventory upgradeInventory;
+
+    public static final int UPGRADE_SLOT_COUNT = 7;
 
     public TileTank() {
         this.attributes = new TankAttributes();
         this.drawerGroup = new SingletonFluidDrawerGroup(this);
+        this.upgradeInventory = new UpgradeInventory();
     }
 
     public SingletonFluidDrawerGroup getDrawerGroup() {
@@ -180,6 +187,118 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
     @Override
     public boolean shouldRenderInPass(int pass) {
         return pass == 0;
+    }
+
+    /**
+     * Exposes the stub upgrade IInventory (7 slots, inert until Phase 9).
+     */
+    public IInventory getUpgradeInventory() {
+        return this.upgradeInventory;
+    }
+
+    // --- inner: UpgradeInventory (stub, 7 slots, inert until Phase 9) ---
+
+    /**
+     * Stub inventory for the 7 upgrade slots. All 7 slots are empty and reject any
+     * item ({@link #isItemValidForSlot} returns false). Phase 9 wires up the real
+     * upgrade logic including {@code canAddUpgrade}/{@code canRemoveUpgrade} and
+     * capacity/attribute changes.
+     *
+     * <p>
+     * NBT persistence is handled here so upgrade contents survive save/reload even
+     * before Phase 9 makes them meaningful (simplifies the Phase 9 diff).
+     */
+    private class UpgradeInventory implements IInventory {
+
+        private final ItemStack[] slots = new ItemStack[UPGRADE_SLOT_COUNT];
+
+        @Override
+        public int getSizeInventory() {
+            return UPGRADE_SLOT_COUNT;
+        }
+
+        @Override
+        public ItemStack getStackInSlot(int index) {
+            return slots[index];
+        }
+
+        @Override
+        public ItemStack decrStackSize(int index, int count) {
+            if (slots[index] != null) {
+                ItemStack result;
+                if (slots[index].stackSize <= count) {
+                    result = slots[index];
+                    slots[index] = null;
+                    onInventoryChanged();
+                } else {
+                    result = slots[index].splitStack(count);
+                    if (slots[index].stackSize == 0) {
+                        slots[index] = null;
+                    }
+                    onInventoryChanged();
+                }
+                return result;
+            }
+            return null;
+        }
+
+        @Override
+        public ItemStack getStackInSlotOnClosing(int index) {
+            if (slots[index] != null) {
+                ItemStack result = slots[index];
+                slots[index] = null;
+                onInventoryChanged();
+                return result;
+            }
+            return null;
+        }
+
+        @Override
+        public void setInventorySlotContents(int index, ItemStack stack) {
+            slots[index] = stack;
+            onInventoryChanged();
+        }
+
+        @Override
+        public String getInventoryName() {
+            return "fluiddrawers.upgrades";
+        }
+
+        @Override
+        public boolean hasCustomInventoryName() {
+            return false;
+        }
+
+        @Override
+        public int getInventoryStackLimit() {
+            return 1;
+        }
+
+        @Override
+        public void markDirty() {
+            TileTank.this.markDirty();
+        }
+
+        @Override
+        public boolean isUseableByPlayer(EntityPlayer player) {
+            return TileTank.this.getDistanceFrom(player.posX, player.posY, player.posZ) <= 64.0D;
+        }
+
+        @Override
+        public void openInventory() {}
+
+        @Override
+        public void closeInventory() {}
+
+        @Override
+        public boolean isItemValidForSlot(int index, ItemStack stack) {
+            // Phase 9: delegate to UpgradeData.canAddUpgrade(stack)
+            return false;
+        }
+
+        public void onInventoryChanged() {
+            TileTank.this.markDirty();
+        }
     }
 
     // --- inner: TankAttributes ---

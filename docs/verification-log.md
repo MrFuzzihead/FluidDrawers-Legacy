@@ -189,3 +189,17 @@ User reported 3 findings after testing Phase 7. All investigated against decompi
 - **Fix:** removed the hardcoded `setBrightness`. The item now inherits the caller's lightmap current coord: inventory slot -> `GuiContainer` sets `(240,240)` full-bright (GuiContainer:105-107, icon stays lit); held in hand -> ambient (dark at night); dropped entity -> ambient (dark at night). Per-face directional shading (`setColorOpaque_F` in `drawBox`) is preserved for the 3D look. Matches the OpenBlocks pattern (`BlockProjectorRenderer` / `ItemRendererTank` do not force item brightness).
 - **Manual re-test:** at night/in complete darkness, hold the tank + drop it → should be dark (not glowing white); in the inventory slot it should still be fully visible (lit). In daylight all three should look normal.
 
+
+## Phase 8 — GUI / Container
+
+| Date    | Check                                                 | Result                                                                                                                       |
+|---------|-------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| (today) | `FdGuis.java` created (IGuiHandler)                   | **DONE** (registered via NetworkRegistry.registerGuiHandler, GUI_TANK = 0)                                                   |
+| (today) | `ContainerTank.java` created                          | **DONE** (7 upgrade slots + player inv + hotbar, SlotDrawerUpgrade backing, transferStackInSlot)                             |
+| (today) | `SlotDrawerUpgrade.java` created                      | **DONE** (isItemValid=false inert until Phase 9, stackLimit=1)                                                               |
+| (today) | `GuiTank.java` created                                | **DONE** (vanilla GuiContainer, Tessellator fluid widget, slot overlays, tank.png bg)                                        |
+| (today) | `TileTank.java` modified (UpgradeInventory stub)      | **DONE** (7-slot IInventory, isItemValidForSlot returns false, inner UpgradeInventory class, getUpgradeInventory() accessor) |
+| (today) | `BlockTank.java` modified (GUI dispatch branch)       | **DONE** (empty-hand+sneak → openGui if StorageDrawers.config.cache.enableDrawerUI; plain right-click does nothing)          |
+| (today) | `CommonProxy.java` modified (FdGuis.init() in init()) | **DONE** (registered via `NetworkRegistry.INSTANCE.registerGuiHandler`)                                                      |
+| (today) | `FluidDrawers.java` modified (@Mod.Instance field)    | **DONE** (instance field for GUI handler registration + player.openGui target)                                               |
+| (today) | `./gradlew build`                                     | **PASS** (BUILD SUCCESSFUL, spotless + compile + reobf)                                                                      |

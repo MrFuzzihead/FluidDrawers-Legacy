@@ -143,11 +143,11 @@ Each phase must pass **all** the following to be considered done:
 > **Status (2026-07-26):** Implemented + `./gradlew build` PASS (21s; `:compileJava`/`:checkstyleMain`/`:jar`/`:reobfJar` clean; Spotless applied). One verified remap: 1.12.2 `Fluid.isLighterThanAir()` -> 1.7.10 `Fluid.getDensity() < 0` (no such method in 1.7.10; Fluid javadoc: "negative density indicates lighter than air"). All 1.7.10 APIs (Tessellator lightmap behavior, `getLightBrightnessForSkyBlocks` packing `(sky<<20)|(block<<4)`, `OpenGlHelper.setLightmapTextureCoords`, `Fluid.*`, `IIcon.*`, `TextureMap.locationBlocksTexture`, `TileEntity.shouldRenderInPass` not @SideOnly) verified against `build/rfg/minecraft-src`. **Manual in-game visual checks pending `./gradlew runClient`** (water/lava render, level tracks fill, torch-brightness tracks) -- see `docs/verification-log.md`. Phase 7 is client-only rendering; no dedicated-server gate (per plan section 4). **Post-test fixes (2026-07-26):** added fluid-luminosity light emission (`BlockTank.getLightValue` + `TileTank.getFluidLightLevel` + relight on change, unscaled by fill per OpenBlocks); tightened TESR GL state (blend only for translucent fluids, no cull toggle) to fix a rare white-flash leak; removed the hardcoded full-bright item brightness so the tank item no longer glows in the dark. See `docs/verification-log.md`.
 
 ### Phase 8 DoD
-- [ ] `IGuiHandler` registered via `NetworkRegistry.registerGuiHandler`.
-- [ ] `ContainerTank` (1.7.10 Container) with upgrade slots backed by stub IInventory.
-- [ ] `GuiTank` extends `GuiContainer`, draws `gui/tank.png` + fluid widget.
-- [ ] Dispatcher: empty-hand+sneak → open GUI (gated by `enableDrawerUI`). Plain right-click does nothing.
-- [ ] GUI-title lang key added.
+- [x] `IGuiHandler` registered via `NetworkRegistry.registerGuiHandler`.
+- [x] `ContainerTank` (1.7.10 Container) with upgrade slots backed by stub IInventory.
+- [x] `GuiTank` extends `GuiContainer`, draws `gui/tank.png` + fluid widget.
+- [x] Dispatcher: empty-hand+sneak → open GUI (gated by `enableDrawerUI`). Plain right-click does nothing.
+- [x] GUI-title lang key added.
 
 ### Phase 9 DoD
 - [ ] UpgradeItemHandler as IInventory (7 slots).

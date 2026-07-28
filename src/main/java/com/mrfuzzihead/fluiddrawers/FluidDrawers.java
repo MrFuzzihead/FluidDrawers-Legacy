@@ -23,6 +23,9 @@ public class FluidDrawers {
     public static final String DEPENDENCIES = "after:StorageDrawers;";
     public static final Logger LOG = LogManager.getLogger(MODID);
 
+    @Mod.Instance(FluidDrawers.MODID)
+    public static FluidDrawers instance;
+
     @SidedProxy(
         clientSide = "com.mrfuzzihead.fluiddrawers.ClientProxy",
         serverSide = "com.mrfuzzihead.fluiddrawers.CommonProxy")
