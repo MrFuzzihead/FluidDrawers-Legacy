@@ -72,22 +72,23 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
     }
 
     /**
-     * Returns the base capacity multiplied by the storage upgrade multiplier,
-     * or the downgraded base capacity if a downgrade is installed.
-     * Phase 9: delegates to the upgrade-aware implementation.
+     * Returns the base capacity, or the downgraded base capacity if a downgrade
+     * is installed. Does NOT multiply by the storage multiplier — that is applied
+     * by {@link FluidDrawerHost#getCapacity()}. Matches the 1.12.2 FD contract
+     * where {@code getCapacity() = getModifiedBaseCapacity() * getStorageMultiplier()}.
      */
     @Override
     public int getModifiedBaseCapacity() {
-        return upgradeData.isDowngraded() ? getDowngradedBaseCapacity()
-            : getUnmodifiedBaseCapacity() * getStorageMultiplier();
+        return upgradeData.isDowngraded() ? Config.baseCapacityDowngraded : getUnmodifiedBaseCapacity();
     }
 
     /**
-     * Returns the downgraded base capacity (from config) multiplied by the
-     * storage upgrade multiplier.
+     * Returns the downgraded base capacity (from config).
+     * Does NOT multiply by the storage multiplier — that is applied by
+     * {@link FluidDrawerHost#getCapacity()}.
      */
     public int getDowngradedBaseCapacity() {
-        return Config.baseCapacityDowngraded * getStorageMultiplier();
+        return Config.baseCapacityDowngraded;
     }
 
     /**
@@ -293,7 +294,7 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
         public boolean canRemoveUpgrade(int slot) {
             ItemStack upgrade = slot >= 0 && slot < UPGRADE_SLOT_COUNT ? upgradeSlots[slot] : null;
             if (upgrade == null) {
-                return false;
+                return true;
             }
             if (DrawerUpgradable.isStorageUpgrade(upgrade)) {
                 int thisMult = DrawerUpgradable.getStorageMultiplier(upgrade);
