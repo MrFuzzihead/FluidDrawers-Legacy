@@ -148,9 +148,9 @@ The 1.12.2 source is layered on three things that **do not exist in 1.7.10** and
 
 ### STRETCH GOALS
 - Framed Tank
-- Controller integration
+- ~~Controller integration~~
 - FCD compat
-- Waila integration
+- ~~Waila integration~~
 - Test piping integration
 
 ## 5. Risks / "verify, don't guess" list (flagged for compile-driven discovery)

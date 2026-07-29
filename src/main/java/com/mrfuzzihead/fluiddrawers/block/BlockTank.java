@@ -11,6 +11,7 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.IIcon;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
@@ -26,6 +27,7 @@ import com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeCreative;
 import com.jaquadro.minecraft.storagedrawers.security.SecurityManager;
 import com.mrfuzzihead.fluiddrawers.FluidDrawers;
 import com.mrfuzzihead.fluiddrawers.FluidDrawersCreativeTab;
+import com.mrfuzzihead.fluiddrawers.drawers.DrawerUpgradable;
 import com.mrfuzzihead.fluiddrawers.drawers.FluidDrawer;
 import com.mrfuzzihead.fluiddrawers.init.FdGuis;
 import com.mrfuzzihead.fluiddrawers.init.ModBlocks;
@@ -232,6 +234,31 @@ public class BlockTank extends Block implements ITileEntityProvider, INetworked 
             // Tape: return false so ItemTape.onItemUse handles sealing
             if (heldItem.getItem() == ModItems.tape) {
                 return false;
+            }
+            // Upgrade items: right-click a tank with an upgrade in hand to
+            // auto-apply it, matching 1.7.10 StorageDrawers BlockDrawers behavior.
+            if (DrawerUpgradable.isUpgradeItem(heldItem)) {
+                if (!tile.addUpgradeInteractive(heldItem)) {
+                    if (!world.isRemote && !(heldItem
+                        .getItem() instanceof com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeStatus)) {
+                        // Check if the failure was due to capacity constraints
+                        // (canAddUpgrade returned false) vs all slots full.
+                        String msgKey = tile.hasUpgradeSpace() ? "storagedrawers.msg.cannotAddUpgrade"
+                            : "storagedrawers.msg.maxUpgrades";
+                        player.addChatMessage(new ChatComponentTranslation(msgKey));
+                    }
+                    return false;
+                }
+                if (!world.isRemote) {
+                    if (!player.capabilities.isCreativeMode) {
+                        heldItem.stackSize--;
+                        if (heldItem.stackSize <= 0) {
+                            player.inventory.setInventorySlotContents(player.inventory.currentItem, null);
+                        }
+                    }
+                    world.markBlockForUpdate(x, y, z);
+                }
+                return true;
             }
             // Lock key: toggle lock attributes (SD 1.7.10 pattern: clear zero-amount
             // prototype on unlock so a different fluid can be inserted afterwards)

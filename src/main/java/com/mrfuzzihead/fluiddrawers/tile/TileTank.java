@@ -220,6 +220,37 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
     }
 
     /**
+     * Attempts to add an upgrade item to the first empty upgrade slot.
+     * Validates via {@link TankUpgradeData#canAddUpgrade} and finds the next
+     * empty slot. Returns true if the upgrade was installed, false if the
+     * upgrade was rejected or all slots are full.
+     * <p>
+     * Called from the right-click (onBlockActivated) path so that right-clicking
+     * the tank with an upgrade in hand applies it directly, matching the 1.7.10
+     * StorageDrawers behavior for BlockDrawers.
+     */
+    public boolean addUpgradeInteractive(ItemStack upgrade) {
+        if (!upgradeData.canAddUpgrade(upgrade)) {
+            return false;
+        }
+        int slot = upgradeData.getNextUpgradeSlot();
+        if (slot == -1) {
+            return false;
+        }
+        upgradeData.setUpgrade(slot, upgrade);
+        return true;
+    }
+
+    /**
+     * Returns true if there is at least one empty upgrade slot (i.e. the tank
+     * is not full of upgrades). Used by the right-click interaction to
+     * distinguish between "can't add" (capacity/validity) and "no space."
+     */
+    public boolean hasUpgradeSpace() {
+        return upgradeData.getNextUpgradeSlot() != -1;
+    }
+
+    /**
      * Check if a storage upgrade can be removed from the given slot without
      * dropping the fluid below the new (lower) capacity.
      */
@@ -455,6 +486,7 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
          */
         private void applyUpgradeEffects() {
             boolean hasVoid = false;
+            boolean hasStorage = false;
             boolean hasVending = false;
             boolean hasRedstone = false;
 
@@ -465,7 +497,9 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
                     hasVoid = true;
                 }
                 if (stack.getItem() instanceof com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeCreative) {
-                    if (stack.getItemDamage() == 1) {
+                    if (stack.getItemDamage() == 0) {
+                        hasStorage = true;
+                    } else if (stack.getItemDamage() == 1) {
                         hasVending = true;
                     }
                 }
@@ -475,7 +509,7 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
             }
 
             attributes.setVoid(hasVoid);
-            // Lock is handled via onBlockActivated interaction (Phase 11), not upgrade slots
+            attributes.setUnlimitedStorage(hasStorage);
             attributes.setUnlimitedVending(hasVending);
             redstoneEmitter = hasRedstone;
 
@@ -523,6 +557,13 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
             FluidStack fluid = drawerGroup.getFluidDrawer()
                 .getStoredFluid();
             return fluid == null || fluid.amount <= newCapacity;
+        }
+
+        public int getNextUpgradeSlot() {
+            for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
+                if (upgradeSlots[i] == null) return i;
+            }
+            return -1;
         }
 
         public void setUpgrade(int slot, ItemStack stack) {

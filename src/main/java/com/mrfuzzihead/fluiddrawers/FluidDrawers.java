@@ -20,7 +20,7 @@ public class FluidDrawers {
 
     public static final String MODID = "fluiddrawers";
     public static final String MODNAME = "Fluid Drawers";
-    public static final String DEPENDENCIES = "after:StorageDrawers;";
+    public static final String DEPENDENCIES = "after:StorageDrawers;after:waila;after:framedcompactdrawers";
     public static final Logger LOG = LogManager.getLogger(MODID);
 
     @Mod.Instance(FluidDrawers.MODID)

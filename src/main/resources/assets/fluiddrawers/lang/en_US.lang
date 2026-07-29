@@ -1,4 +1,4 @@
-# FluidDrawers Language File
+﻿# FluidDrawers Language File
 # Block
 tile.fluiddrawers.tank.name=Fluid Tank
 
@@ -27,7 +27,8 @@ fluiddrawers.msg.unlocked=Tank unlocked
 # WAILA (Phase 13)
 fluiddrawers.waila.empty=Empty
 fluiddrawers.waila.fluid=%s: %s / %s mB
-fluiddrawers.waila.fluid_creative=%s: [\u221E]
+fluiddrawers.waila.fluid_unlimited=%s: %s / ∞ mB
+fluiddrawers.waila.fluid_creative=%s: [∞]
 fluiddrawers.waila.tank_prefix=Tank
 fluiddrawers.waila.locked=Locked
 fluiddrawers.waila.void=Void

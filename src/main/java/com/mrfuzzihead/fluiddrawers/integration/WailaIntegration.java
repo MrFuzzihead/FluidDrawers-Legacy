@@ -65,17 +65,24 @@ public final class WailaIntegration {
                 .getFluidDrawer(0);
             FluidStack fluid = drawer.getStoredFluid();
 
-            if (fluid != null && fluid.amount > 0) {
+            if (tank.getAttributes()
+                .isUnlimitedVending()) {
+                // Creative vending: infinite content and capacity
+                String fluidName = fluid != null && fluid.amount > 0 ? fluid.getLocalizedName()
+                    : StatCollector.translateToLocal("fluiddrawers.waila.empty");
+                currenttip.add(StatCollector.translateToLocalFormatted("fluiddrawers.waila.fluid_creative", fluidName));
+            } else if (fluid != null && fluid.amount > 0) {
                 String fluidName = fluid.getLocalizedName();
                 int amount = fluid.amount;
                 int capacity = drawer.getMaxCapacity();
                 if (tank.getAttributes()
-                    .isUnlimitedVending()
-                    || tank.getAttributes()
-                        .isUnlimitedStorage()) {
-                    currenttip
-                        .add(StatCollector.translateToLocalFormatted("fluiddrawers.waila.fluid_creative", fluidName));
+                    .isUnlimitedStorage()) {
+                    // Creative storage: finite content, infinite capacity
+                    currenttip.add(
+                        StatCollector
+                            .translateToLocalFormatted("fluiddrawers.waila.fluid_unlimited", fluidName, amount));
                 } else {
+                    // Normal: finite content and capacity
                     currenttip.add(
                         StatCollector
                             .translateToLocalFormatted("fluiddrawers.waila.fluid", fluidName, amount, capacity));
