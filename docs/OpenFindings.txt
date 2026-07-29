@@ -1,6 +1,6 @@
 Phase 7:
     - Tank in any slot in hotbar. Select slot with item in it, tank is darker. Select slot with no item in it (empy hand), tank is normal brightness (INVENTORY ONLY). GL issues maybe if latter?
-    - Tank's glass does not render alpha properly now when empty in inventory
 
 Miscellaneous:
-    - GL leaks
+    - GL leaks (tentatively considered fixed)
+    - Remove WAILA reflection if possible

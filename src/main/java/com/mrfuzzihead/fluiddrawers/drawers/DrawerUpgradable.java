@@ -31,7 +31,7 @@ public class DrawerUpgradable {
      * <li>{@link ItemUpgradeRedstone} (redstone combined/max/min)</li>
      * <li>{@link ItemUpgradeStatus} (status level 1/2/3)</li>
      * </ul>
-     * 
+     *
      * Note: {@code ItemUpgradeLock} (the Drawer Key) is NOT included — it is a
      * physical key used by right-clicking the block, not an upgrade-slot item.
      * Lock behavior is handled via {@code onBlockActivated} interaction (Phase 11).

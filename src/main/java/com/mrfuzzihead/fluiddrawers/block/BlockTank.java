@@ -24,6 +24,7 @@ import com.jaquadro.minecraft.storagedrawers.api.storage.attribute.LockAttribute
 import com.jaquadro.minecraft.storagedrawers.core.ModItems;
 import com.jaquadro.minecraft.storagedrawers.item.ItemPersonalKey;
 import com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeCreative;
+import com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeStatus;
 import com.jaquadro.minecraft.storagedrawers.security.SecurityManager;
 import com.mrfuzzihead.fluiddrawers.FluidDrawers;
 import com.mrfuzzihead.fluiddrawers.FluidDrawersCreativeTab;
@@ -70,7 +71,7 @@ public class BlockTank extends Block implements ITileEntityProvider, INetworked 
     public BlockTank() {
         super(Material.iron);
         this.isBlockContainer = true;
-        this.setBlockName("fluiddrawers.tank");
+        this.setBlockName(FluidDrawers.MODID + ".tank");
         this.setHardness(5.0F);
         this.setStepSound(soundTypeMetal);
         this.setCreativeTab(FluidDrawersCreativeTab.INSTANCE);
@@ -239,8 +240,7 @@ public class BlockTank extends Block implements ITileEntityProvider, INetworked 
             // auto-apply it, matching 1.7.10 StorageDrawers BlockDrawers behavior.
             if (DrawerUpgradable.isUpgradeItem(heldItem)) {
                 if (!tile.addUpgradeInteractive(heldItem)) {
-                    if (!world.isRemote && !(heldItem
-                        .getItem() instanceof com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeStatus)) {
+                    if (!world.isRemote && !(heldItem.getItem() instanceof ItemUpgradeStatus)) {
                         // Check if the failure was due to capacity constraints
                         // (canAddUpgrade returned false) vs all slots full.
                         String msgKey = tile.hasUpgradeSpace() ? "storagedrawers.msg.cannotAddUpgrade"

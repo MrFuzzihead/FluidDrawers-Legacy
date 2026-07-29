@@ -13,7 +13,7 @@ public class FluidDrawersCreativeTab extends CreativeTabs {
     public static final FluidDrawersCreativeTab INSTANCE = new FluidDrawersCreativeTab();
 
     public FluidDrawersCreativeTab() {
-        super("fluiddrawers");
+        super(FluidDrawers.MODID);
     }
 
     @Override

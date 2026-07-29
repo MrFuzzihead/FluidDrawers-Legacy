@@ -21,6 +21,10 @@ import com.jaquadro.minecraft.storagedrawers.StorageDrawers;
 import com.jaquadro.minecraft.storagedrawers.api.security.ISecurityProvider;
 import com.jaquadro.minecraft.storagedrawers.api.storage.attribute.IProtectable;
 import com.jaquadro.minecraft.storagedrawers.api.storage.attribute.ISealable;
+import com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeCreative;
+import com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeRedstone;
+import com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeStatus;
+import com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeVoid;
 import com.mrfuzzihead.fluiddrawers.Config;
 import com.mrfuzzihead.fluiddrawers.drawers.DrawerUpgradable;
 import com.mrfuzzihead.fluiddrawers.drawers.FluidDrawerGroup;
@@ -493,17 +497,17 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
             for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
                 ItemStack stack = upgradeSlots[i];
                 if (stack == null) continue;
-                if (stack.getItem() instanceof com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeVoid) {
+                if (stack.getItem() instanceof ItemUpgradeVoid) {
                     hasVoid = true;
                 }
-                if (stack.getItem() instanceof com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeCreative) {
+                if (stack.getItem() instanceof ItemUpgradeCreative) {
                     if (stack.getItemDamage() == 0) {
                         hasStorage = true;
                     } else if (stack.getItemDamage() == 1) {
                         hasVending = true;
                     }
                 }
-                if (stack.getItem() instanceof com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeRedstone) {
+                if (stack.getItem() instanceof ItemUpgradeRedstone) {
                     hasRedstone = true;
                 }
             }
@@ -535,7 +539,7 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
             if (!DrawerUpgradable.isUpgradeItem(upgrade)) {
                 return false;
             }
-            if (upgrade.getItem() instanceof com.jaquadro.minecraft.storagedrawers.item.ItemUpgradeStatus) {
+            if (upgrade.getItem() instanceof ItemUpgradeStatus) {
                 return false;
             }
             if (DrawerUpgradable.isStorageUpgrade(upgrade)) {

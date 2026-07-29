@@ -42,7 +42,7 @@ import cpw.mods.fml.common.registry.GameRegistry;
  * <p>
  * Pattern:
  * </p>
- * 
+ *
  * <pre>
  * GPG
  * GBG

@@ -6,6 +6,7 @@ import com.mrfuzzihead.fluiddrawers.init.ModRecipes;
 import com.mrfuzzihead.fluiddrawers.tile.TileTank;
 
 import cpw.mods.fml.common.event.FMLInitializationEvent;
+import cpw.mods.fml.common.event.FMLInterModComms;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
@@ -18,9 +19,7 @@ public class CommonProxy {
 
         ModBlocks.init();
 
-        GameRegistry.registerTileEntity(TileTank.class, "fluiddrawers_tile");
-
-        FluidDrawers.LOG.info("I am FluidDrawers at version " + Tags.VERSION);
+        GameRegistry.registerTileEntity(TileTank.class, FluidDrawers.MODID + "_tile");
     }
 
     public void init(FMLInitializationEvent event) {
@@ -30,7 +29,7 @@ public class CommonProxy {
         // Register WAILA integration if WAILA is loaded (compileOnly + runtimeOnly dep).
         try {
             Class.forName("mcp.mobius.waila.api.IWailaRegistrar");
-            cpw.mods.fml.common.event.FMLInterModComms.sendMessage(
+            FMLInterModComms.sendMessage(
                 "Waila",
                 "register",
                 "com.mrfuzzihead.fluiddrawers.integration.WailaIntegration.registerProvider");
