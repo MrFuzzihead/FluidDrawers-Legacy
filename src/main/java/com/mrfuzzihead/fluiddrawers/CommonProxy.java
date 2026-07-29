@@ -26,6 +26,18 @@ public class CommonProxy {
     public void init(FMLInitializationEvent event) {
         FdGuis.init();
         ModRecipes.init();
+
+        // Register WAILA integration if WAILA is loaded (compileOnly + runtimeOnly dep).
+        try {
+            Class.forName("mcp.mobius.waila.api.IWailaRegistrar");
+            cpw.mods.fml.common.event.FMLInterModComms.sendMessage(
+                "Waila",
+                "register",
+                "com.mrfuzzihead.fluiddrawers.integration.WailaIntegration.registerProvider");
+            FluidDrawers.LOG.info("WAILA integration registered");
+        } catch (ClassNotFoundException e) {
+            // WAILA not available — integration skipped silently.
+        }
     }
 
     public void postInit(FMLPostInitializationEvent event) {}

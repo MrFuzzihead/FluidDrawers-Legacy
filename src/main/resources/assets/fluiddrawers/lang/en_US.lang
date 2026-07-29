@@ -24,6 +24,17 @@ fluiddrawers.msg.owner_cleared=Owner cleared
 fluiddrawers.msg.locked=Tank locked
 fluiddrawers.msg.unlocked=Tank unlocked
 
+# WAILA (Phase 13)
+fluiddrawers.waila.empty=Empty
+fluiddrawers.waila.fluid=%s: %s / %s mB
+fluiddrawers.waila.fluid_creative=%s: [\u221E]
+fluiddrawers.waila.tank_prefix=Tank
+fluiddrawers.waila.locked=Locked
+fluiddrawers.waila.void=Void
+fluiddrawers.waila.sealed=Sealed
+fluiddrawers.waila.protected=Protected
+fluiddrawers.waila.creative=Creative
+
 # Item tooltip (Phase 12)
 fluiddrawers.tooltip.fluid=%s: %s / %s mB
 fluiddrawers.tooltip.locked=Locked
