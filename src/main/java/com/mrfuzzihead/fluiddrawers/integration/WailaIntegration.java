@@ -124,6 +124,11 @@ public final class WailaIntegration {
                 attrib.append(appendComma(attrib))
                     .append(StatCollector.translateToLocal("fluiddrawers.waila.void"));
             }
+            if (tank.getAttributes()
+                .isConcealed()) {
+                attrib.append(appendComma(attrib))
+                    .append(StatCollector.translateToLocal("fluiddrawers.tooltip.concealed"));
+            }
             if (tank.isSealed()) {
                 attrib.append(appendComma(attrib))
                     .append(StatCollector.translateToLocal("fluiddrawers.waila.sealed"));
