@@ -130,6 +130,14 @@ public class SimpleFluidDrawer implements FluidDrawer {
     public void deserializeNBT(NBTTagCompound tag) {
         if (tag.hasKey("Fluid")) {
             this.fluid = FluidStack.loadFluidStackFromNBT(tag.getCompoundTag("Fluid"));
+        } else {
+            // Absent "Fluid" tag means the tank was drained to empty (unlocked tank: fluid set to
+            // null in setStoredFluid). Clearing here is required so an already-loaded client drawer
+            // (e.g. on a description-packet sync, or chunk reload) doesn't retain a stale fluid.
+            // Without this, draining the last bucket via a server-only path (e.g. the SD controller
+            // mixin, which runs interactPutItemsIntoInventory server-side only) leaves the client
+            // rendering the old amount until the chunk is fully reloaded.
+            this.fluid = null;
         }
     }
 }

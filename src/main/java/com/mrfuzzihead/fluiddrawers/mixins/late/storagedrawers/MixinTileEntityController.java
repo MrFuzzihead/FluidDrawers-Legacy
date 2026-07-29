@@ -10,6 +10,7 @@ import java.util.Set;
 
 import net.minecraft.block.Block;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraftforge.common.util.ForgeDirection;
@@ -213,7 +214,18 @@ public abstract class MixinTileEntityController extends TileEntity implements IF
             // bypass=false: the controller's IFluidHandler respects lock/void rules, matching the
             // 1.12.2 controller (which had no bypass path). ForgeDirection.UNKNOWN because the
             // controller routes to all connected tanks regardless of the clicked side.
-            BlockInteractionUtils.transferFluid((IFluidHandler) this, player, held, ForgeDirection.UNKNOWN, false);
+            boolean transferred = BlockInteractionUtils
+                .transferFluid((IFluidHandler) this, player, held, ForgeDirection.UNKNOWN, false);
+            // This inject runs server-side only (BlockController calls interactPutItemsIntoInventory
+            // solely when !world.isRemote), so the client never predicts the inventory change —
+            // unlike direct bucket-on-tank (BlockTank runs transferFluid on both sides). The vanilla
+            // post-block-use sync only refreshes the HELD slot; a filled container placed into a free
+            // inventory slot (stack-of-2+ empty buckets) would otherwise stay invisible until the
+            // player clicks around. Mirror SD's CommonProxy.updatePlayerInventory: full inventory
+            // re-send only when a transfer actually happened.
+            if (transferred && player instanceof EntityPlayerMP) {
+                ((EntityPlayerMP) player).sendContainerToPlayer(player.inventoryContainer);
+            }
         }
         // Always cancel for fluid containers (even on a failed transfer) so a bucket is never stored
         // as an item in the controller's drawers — matches the 1.12.2 unconditional cancel.

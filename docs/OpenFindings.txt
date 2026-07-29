@@ -7,3 +7,5 @@ Phase 10:
 
 Miscellaneous:
     - Redstone upgrades don't turn off redstone signal when removed, but they do still update on tank fill/drain
+    - Right clicking (no shift) on fluid tank should immediately apply upgrades in hand
+    - Controller should be able to take fluid container as item instead of fluid if storage drawer storing it is closer than fluid tank

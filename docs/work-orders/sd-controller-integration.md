@@ -62,3 +62,32 @@ happens during SD's class load. **Fix:** added `(CallbackInfo ci)` to `fluiddraw
 + the `CallbackInfo` import. The other inject (`interceptFluidContainer` into the `int`-returning
 `interactPutItemsIntoInventory`) already correctly takes `CallbackInfoReturnable<Integer>`. Build PASS.
 
+## Third finding — drain-to-zero visual desync (2026-07-28) — FIXED
+Draining the LAST bucket via the controller "technically" drained (bucket filled, server state 0)
+but the tank render still showed 1 bucket. Cause: an **asymmetry in the fluid NBT sync**.
+`SimpleFluidDrawer.serializeNBT` only writes the `"Fluid"` tag when `fluid != null`; draining an
+unlocked tank to zero sets `fluid = null`, so the tag is **omitted**. `SimpleFluidDrawer.deserializeNBT`
+only READ the fluid when the tag was present — it never CLEARED it when absent, so an already-loaded
+client drawer retained the stale fluid. Fill worked (tag present); drain-to-zero didn't (tag absent).
+Direct bucket-on-tank avoided this only because `BlockTank.onBlockActivated` runs `transferFluid` on
+the client too (client-side prediction mutates the drawer directly), whereas the controller path runs
+`interactPutItemsIntoInventory` server-only (`!world.isRemote`) and relies on the description packet.
+`Block.hasTileEntity` already returns true (Forge: `isTileProvider`, since BlockTank implements
+ITileEntityProvider), so the packet WAS sent — the bug was purely the client not clearing on
+absent-tag. **Fix:** `deserializeNBT` now sets `this.fluid = null` in the `else` branch. This also
+fixes the latent drain-to-zero + chunk-reload case. Build PASS.
+
+## Fourth finding — filled container invisible in inventory (stack-of-2+) (2026-07-28) — FIXED
+Right-clicking the controller front face with a STACK of 2+ empty buckets filled one bucket
+(server state correct) but the resulting filled bucket was invisible in the inventory until the
+player clicked around. Cause: `BlockInteractionUtils.deductHeldAndGiveItem`, for `stackSize > 1`,
+decrements the held slot then calls `addItemStackToInventory(filledContainer)` — placing the filled
+bucket in a FREE inventory slot. The vanilla post-block-use sync only refreshes the HELD slot (which
+is why it worked for the single-bucket case where the filled bucket replaces the held slot, and why
+the held -1-empty-bucket slot always showed). The free-slot add was never synced. Direct
+bucket-on-tank hid this via client-side prediction (BlockTank runs transferFluid on both sides). **Fix:**
+the controller inject now captures `transferFluid`'s boolean return and, on success, calls
+`((EntityPlayerMP) player).sendContainerToPlayer(player.inventoryContainer)` — mirroring SD's own
+`CommonProxy.updatePlayerInventory` (used by TileEntityController's dump path and TileEntityDrawers),
+which forces a full `S30PacketWindowItems` inventory re-send. Build PASS.
+
