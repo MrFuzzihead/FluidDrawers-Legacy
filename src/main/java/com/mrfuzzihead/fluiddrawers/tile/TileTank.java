@@ -511,11 +511,17 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
             attributes.setVoid(hasVoid);
             attributes.setUnlimitedStorage(hasStorage);
             attributes.setUnlimitedVending(hasVending);
+
+            boolean redstoneChanged = (redstoneEmitter != hasRedstone);
             redstoneEmitter = hasRedstone;
 
             if (worldObj != null && !worldObj.isRemote) {
                 worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
-                if (hasRedstone) {
+                // Notify neighbors when redstone state changes, not only when
+                // it becomes true. Without this, removing a redstone upgrade
+                // leaves the block still appearing to emit power because
+                // neighbors never re-read the (now-zero) signal.
+                if (redstoneChanged) {
                     notifyNeighbors();
                 }
             }

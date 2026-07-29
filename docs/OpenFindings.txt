@@ -6,5 +6,4 @@ Phase 10:
     - Status upgrades unusable
 
 Miscellaneous:
-    - Redstone upgrades don't turn off redstone signal when removed, but they do still update on tank fill/drain
     - Controller should be able to take fluid container as item instead of fluid if storage drawer storing it is closer than fluid tank
