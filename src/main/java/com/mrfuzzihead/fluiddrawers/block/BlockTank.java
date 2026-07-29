@@ -302,6 +302,25 @@ public class BlockTank extends Block implements ITileEntityProvider, INetworked 
                 }
                 return true;
             }
+            // Quantify key: toggle the showing-quantity attribute, which renders a floating
+            // "fluid name / X mB" label on all four sides of the tank (RenderTileTank).
+            // Matches SD 1.7.10 BlockDrawers: setIsQuantified(!isQuantified()). Slot per the
+            // section 4 dispatcher: after shroud, before personal key (SD order: lock → shroud
+            // → quantify → personal). markBlockForUpdate pushes the attribute change to the
+            // client so the TESR label appears/disappears immediately. The fluid amount is
+            // already synced via the vanilla description packet (the 1.12.2 custom sync
+            // packets are not needed -- our unified portable NBT carries fluid + count + the
+            // quant attribute together; Chameleon's data split that necessitated them is gone).
+            if (heldItem.getItem() == ModItems.quantifyKey) {
+                if (!world.isRemote) {
+                    tile.getAttributes()
+                        .setShowingQuantity(
+                            !tile.getAttributes()
+                                .isShowingQuantity());
+                    world.markBlockForUpdate(x, y, z);
+                }
+                return true;
+            }
             // Personal key: toggle ownership
             if (heldItem.getItem() instanceof ItemPersonalKey) {
                 if (!world.isRemote) {

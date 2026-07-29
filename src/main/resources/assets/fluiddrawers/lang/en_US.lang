@@ -40,4 +40,5 @@ fluiddrawers.waila.creative=Creative
 fluiddrawers.tooltip.fluid=%s: %s / %s mB
 fluiddrawers.tooltip.locked=Locked
 fluiddrawers.tooltip.concealed=Concealed
+fluiddrawers.tooltip.quantified=Quantified
 

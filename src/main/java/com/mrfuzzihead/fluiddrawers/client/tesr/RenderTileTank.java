@@ -1,6 +1,7 @@
 package com.mrfuzzihead.fluiddrawers.client.tesr;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.texture.TextureMap;
@@ -11,6 +12,7 @@ import net.minecraftforge.fluids.FluidStack;
 
 import org.lwjgl.opengl.GL11;
 
+import com.mrfuzzihead.fluiddrawers.Config;
 import com.mrfuzzihead.fluiddrawers.drawers.FluidDrawer;
 import com.mrfuzzihead.fluiddrawers.tile.TileTank;
 
@@ -45,7 +47,11 @@ import cpw.mods.fml.relauncher.SideOnly;
  * lighting and a transient (world-less) {@link TileTank} reconstructed from portable NBT.
  *
  * <p>
- * Deferred to Phase 14: the {@code isShowingQuantity()} floating label + its sync packets.
+ * Phase 14: when the {@code isShowingQuantity()} attribute is set (toggled by the SD quantify
+ * key), {@link #renderQuantityLabel} draws a floating "fluid name / X mB" label on all four
+ * sides, porting the 1.12.2 {@code renderLabelText} 4-side loop to 1.7.10 {@link FontRenderer}
+ * + {@link GL11}. The label is hidden when the tank is concealed (matching the 1.12.2 nesting
+ * inside the {@code !isConcealed()} guard).
  */
 @SideOnly(Side.CLIENT)
 public class RenderTileTank extends TileEntitySpecialRenderer {
@@ -86,9 +92,12 @@ public class RenderTileTank extends TileEntitySpecialRenderer {
 
         renderFluid(tile, ambLight, x, y, z);
 
-        // TODO Phase 14: if (tile.getAttributes().isShowingQuantity()) render the floating
-        // "fluid name / X mB" label on all four sides (FontRenderer + the
-        // SPacketSyncFluidDrawerCount/Fluid custom sync packets). Deferred -- not part of Phase 7.
+        // Phase 14: floating "fluid name / X mB" label on all four sides when the quantify
+        // attribute is set. The fluid amount + attribute are already synced to the client via
+        // the vanilla description packet, so no custom sync packets are needed (the 1.12.2
+        // SPacketSyncFluidDrawerCount/Fluid packets worked around Chameleon's split TE data,
+        // which our unified portable NBT does not have).
+        renderQuantityLabel(tile, x, y, z);
     }
 
     /**
@@ -266,6 +275,87 @@ public class RenderTileTank extends TileEntitySpecialRenderer {
         tess.addVertexWithUV(HALF_WIDTH, yMax, HALF_WIDTH, uMax, vMax);
         tess.addVertexWithUV(HALF_WIDTH, yMax, -HALF_WIDTH, uMax, vMin);
         tess.draw();
+    }
+
+    /**
+     * Phase 14 floating label: draws "fluid name / X mB" on all four sides of the tank when the
+     * {@code isShowingQuantity()} attribute is set. Ports the 1.12.2 {@code RenderTileTank}
+     * label block verbatim (the GL transforms are geometry, not API): push, scale
+     * {@code (1/128, -1/128, 1/128)}, rotate 180&deg; about Y (so the text faces outward and is
+     * not mirrored), translate to the first face, then draw + rotate 90&deg; three more times.
+     *
+     * <p>
+     * Gates (matching the 1.12.2 nesting): not concealed, fluid present with amount &gt; 0, and
+     * {@code isShowingQuantity()}. GL lighting is disabled and depth-write masked so the text is
+     * full-bright and not occluded by the glass frame (SD {@code renderText} pattern); both are
+     * restored after.
+     */
+    private void renderQuantityLabel(TileTank tile, double x, double y, double z) {
+        // A concealed tank hides its contents, including the quantity label (1.12.2 nests the
+        // label inside the !isConcealed() guard).
+        if (tile.getAttributes()
+            .isConcealed()) return;
+        if (!tile.getAttributes()
+            .isShowingQuantity()) return;
+
+        FluidDrawer drawer = tile.getDrawerGroup()
+            .getFluidDrawer();
+        FluidStack fluid = drawer.getStoredFluid();
+        if (fluid == null || fluid.amount <= 0) return;
+
+        FontRenderer fr = Minecraft.getMinecraft().fontRenderer;
+        String nameLabel = fluid.getLocalizedName();
+        String qtyLabel = String.format("%,d mB", fluid.amount);
+        float nameHalfWidth = fr.getStringWidth(nameLabel) / 2.0F;
+        float qtyHalfWidth = fr.getStringWidth(qtyLabel) / 2.0F;
+
+        boolean prevLighting = GL11.glGetBoolean(GL11.GL_LIGHTING);
+        boolean prevDepthMask = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
+        GL11.glDisable(GL11.GL_LIGHTING);
+        GL11.glDepthMask(false);
+
+        GL11.glPushMatrix();
+        GL11.glTranslated(x, y, z);
+        // Scale to font units (1 block = 128 units), flip Y (font Y is down, world Y is up).
+        GL11.glScalef(0.0078125F, -0.0078125F, 0.0078125F);
+        // Face outward on the first side (text is mirrored without the 180deg Y rotation).
+        GL11.glRotatef(180.0F, 0.0F, 1.0F, 0.0F);
+        GL11.glTranslatef(-64.0F, -8.0F - fr.FONT_HEIGHT / 2.0F, 0.01F);
+        renderLabelText(fr, nameLabel, nameHalfWidth, qtyLabel, qtyHalfWidth);
+
+        // Draw the remaining three sides: step to the next face center and rotate 90deg about Y.
+        for (int i = 0; i < 3; i++) {
+            GL11.glTranslatef(64.01F, 0.0F, -64.01F);
+            GL11.glRotatef(90.0F, 0.0F, 1.0F, 0.0F);
+            renderLabelText(fr, nameLabel, nameHalfWidth, qtyLabel, qtyHalfWidth);
+        }
+
+        GL11.glPopMatrix();
+
+        GL11.glDepthMask(prevDepthMask);
+        if (prevLighting) GL11.glEnable(GL11.GL_LIGHTING);
+    }
+
+    /**
+     * Draws the two-line label (fluid name above, quantity below) centered horizontally at the
+     * current origin. The name line is gated by {@link Config#quantifyShowsFluidName}. Each line
+     * is wrapped in its own push/translate/pop so they position independently. Ports the 1.12.2
+     * {@code renderLabelText}; {@code drawString(text, 0, 0, -1)} is the no-shadow variant
+     * (color {@code -1} = {@code 0xFFFFFFFF} = white, full alpha).
+     */
+    private static void renderLabelText(FontRenderer fr, String line1, float halfWidth1, String line2,
+        float halfWidth2) {
+        if (Config.quantifyShowsFluidName) {
+            GL11.glPushMatrix();
+            GL11.glTranslatef(-halfWidth1, -16.0F, 0.0F);
+            fr.drawString(line1, 0, 0, -1);
+            GL11.glPopMatrix();
+        }
+
+        GL11.glPushMatrix();
+        GL11.glTranslatef(-halfWidth2, 0.0F, 0.0F);
+        fr.drawString(line2, 0, 0, -1);
+        GL11.glPopMatrix();
     }
 
     private static float clamp01(float v) {

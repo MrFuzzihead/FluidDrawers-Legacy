@@ -162,6 +162,10 @@ public class ItemBlockTank extends ItemBlock {
             if (attrsTag.getBoolean("concealed")) {
                 list.add(EnumChatFormatting.GRAY + StatCollector.translateToLocal("fluiddrawers.tooltip.concealed"));
             }
+            // --- Quantity (quantify) status ---
+            if (attrsTag.getBoolean("quant")) {
+                list.add(EnumChatFormatting.GRAY + StatCollector.translateToLocal("fluiddrawers.tooltip.quantified"));
+            }
         }
     }
 }

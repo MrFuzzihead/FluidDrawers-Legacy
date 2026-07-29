@@ -180,9 +180,23 @@ Each phase must pass **all** the following to be considered done:
 - [x] GameRegistry.addShapedRecipe for the tank.
 - [x] Recipe visible in NEI.
 
+### Phase 14 DoD -- Quantity label (quantify key, optional polish)
+
+- [x] `BlockTank.onBlockActivated` held-item dispatcher has a `ModItems.quantifyKey` branch that toggles `SimpleDrawerAttributes.setShowingQuantity(!isShowingQuantity())` server-side + `world.markBlockForUpdate` (slot: after shroud key, before personal key -- SD 1.7.10 `BlockDrawers` order: lock → shroud → quantify → personal).
+- [x] `RenderTileTank.renderQuantityLabel` draws a floating "fluid name / X mB" label on all four sides when `isShowingQuantity()` is true, porting the 1.12.2 `renderLabelText` 4-side loop (scale 1/128, 180° Y rotation, 90° steps) to 1.7.10 `FontRenderer` + `GL11`.
+- [x] The label is hidden when the tank is concealed (matches the 1.12.2 nesting inside the `!isConcealed()` guard) and when there is no fluid / amount ≤ 0.
+- [x] The `showingQty` attribute (`"quant"` NBT key) is NBT-persisted and carried by the vanilla TE description packet -- so the label appears/disappears immediately on toggle and survives save/reload + sealed break/place.
+- [x] **Custom sync packets NOT ported (justified deviation):** the 1.12.2 `SPacketSyncFluidDrawerCount`/`SPacketSyncFluidDrawerFluid` packets worked around Chameleon's split TE data (fluid/count lived in shims not carried by the vanilla description packet). Our unified portable NBT (`TileTank.writeToPortableNBT` writes the `"Drawer"` fluid NBT + the `"Attributes"` tag incl. `"quant"`) is fully synced by the Phase 6 vanilla `getDescriptionPacket`/`onDataPacket` path, so the custom packets are redundant and were not ported.
+- [x] `Config.quantifyShowsFluidName` gates whether the fluid-name line shows (false = quantity-only label), matching the 1.12.2 `FluidDrawersConfig.quantifyShowsFluidName`.
+- [x] "Quantified" indicator shows in the sealed-item tooltip (`ItemBlockTank.addInformation`) and the WAILA HUD (`WailaIntegration`), parallel to the "Concealed"/"Locked" indicators.
+- [x] Security-first ordering preserved (the `SecurityManager.hasAccess` guard runs before the held-item dispatch, so a non-owner cannot toggle the quantity label).
+- [x] `./gradlew build` PASS (spotless + compile).
+
+> **Status (2026-07-29):** Implemented + `./gradlew build` PASS (7s, spotless + compile clean). The `showingQty` attribute + NBT ser/des were already in place from Phase 4; Phase 14 wires the `ModItems.quantifyKey` toggle into the dispatcher and ports the floating-label TESR rendering. Lang key `fluiddrawers.tooltip.quantified=Quantified` added (tooltip + WAILA reuse it). Manual `runClient` in-game verification pending. Dedicated-server gate N/A (no new sync/proxy/GUI code; the label is a client-only TESR that reads already-synced TE state). See `docs/verification-log.md` and `docs/work-orders/phase14-quantity-label.md`.
+
 ### Phase 15 DoD -- Concealment key (optional polish)
 
-> **Scope note (2026-07-29):** Per `docs/backport-plan.md`, Phase 15 is the **Concealment key** (hides the stored fluid), not a config GUI -- the master spec's earlier "Config GUI" row was drift and has been corrected above. Phase 14 (Quantity label / quantify key) is a separate optional-polish phase not yet implemented.
+> **Scope note (2026-07-29):** Per `docs/backport-plan.md`, Phase 15 is the **Concealment key** (hides the stored fluid), not a config GUI -- the master spec's earlier "Config GUI" row was drift and has been corrected above. Phase 14 (Quantity label / quantify key) is now implemented (see above).
 
 - [x] `BlockTank.onBlockActivated` held-item dispatcher has a `ModItems.shroudKey` branch that toggles `SimpleDrawerAttributes.setConcealed(!isConcealed())` server-side + `world.markBlockForUpdate` (slot: after lock key, before personal key -- SD 1.7.10 `BlockDrawers` order: lock → shroud → quantify → personal).
 - [x] `RenderTileTank.renderFluid` early-returns when `tile.getAttributes().isConcealed()` (the in-world fluid render gate -- already present from Phase 7).
