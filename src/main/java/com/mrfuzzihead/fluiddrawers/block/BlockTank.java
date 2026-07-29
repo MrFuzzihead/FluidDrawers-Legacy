@@ -18,6 +18,7 @@ import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.FluidStack;
 
 import com.jaquadro.minecraft.storagedrawers.StorageDrawers;
+import com.jaquadro.minecraft.storagedrawers.api.storage.INetworked;
 import com.jaquadro.minecraft.storagedrawers.api.storage.attribute.LockAttribute;
 import com.jaquadro.minecraft.storagedrawers.core.ModItems;
 import com.jaquadro.minecraft.storagedrawers.item.ItemPersonalKey;
@@ -34,7 +35,7 @@ import com.mrfuzzihead.fluiddrawers.util.BlockInteractionUtils;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
-public class BlockTank extends Block implements ITileEntityProvider {
+public class BlockTank extends Block implements ITileEntityProvider, INetworked {
 
     @SideOnly(Side.CLIENT)
     private IIcon iconTank;

@@ -207,3 +207,28 @@ Every user-facing string (GUI titles, lock/seal/ownership messages, upgrade tool
 | SD Controller Integration | FluidDrawerController, FluidControllerProxy, ControllerFluidCapabilityHandler, DrawerReflect, FluidDrawersCoreHooks, TileEntityController mixin                                        | Phases 0-12 + TileEntityController 1.7.10 structure verified + reflection/mixin access confirmed |
 | FramedCompactDrawers      | FramedDrawerHandler                                                                                                                                                                    | Framed tank milestone + FC mod available                                                         |
 | Waila                     | (none in FD source; Waila is already a compileOnly dep for potential own handler)                                                                                                      | Any phase; low priority                                                                          |
+
+> **Status (2026-07-28): SD Controller Integration — IMPLEMENTED** (stretch milestone done). The
+> 1.12.2 trio `FluidDrawerController` (capability) + `ControllerFluidCapabilityHandler`
+> (right-click event) + `DrawerReflect` (reflection into `TileEntityController.storage`) is
+> replaced by a single reflection-free **mixin**: `MixinTileEntityController` (in
+> `mixins/late/storagedrawers/`, registered in `Mixins.java` via
+> `addCommonMixins("storagedrawers.MixinTileEntityController")`). It (a) makes the controller
+> implement 1.7.10 `IFluidHandler`, routing fill/drain across all connected Fluid Tanks via the
+> `FluidDrawer` API (priority-sorted, `bypass=false`), discovered by its **own INetworked BFS**
+> (the controller's private `storage`/`StorageRecord` types are package-private/private-inner and
+> inaccessible to a mixin source — so the mixin re-scans the network instead of reflecting); (b)
+> intercepts `interactPutItemsIntoInventory` so right-clicking the controller's front face with a
+> fluid container (bucket, etc.) fills/drains connected tanks via `BlockInteractionUtils`; and (c)
+> exposing `IFluidHandler` also lets pipes/hoppers pump to/from the controller → distributed to
+> tanks. `BlockTank implements INetworked` so the network geometry routes through tanks. The
+> `@Shadow`/`@Inject` mod-class targets use `remap=false`; inherited `TileEntity` fields are
+> reached by declaring the mixin `extends TileEntity` (reobf-safe, no refmap). The reflection-based
+> `DrawerReflect` port was deleted as obsolete. `./gradlew build` PASS, zero mixin warnings, empty
+> refmap (correct for mod-class targets). **Pending:** `runClient` in-game verification
+> (right-click controller with water bucket → connected tank fills; empty bucket → drains).
+>
+> **Bug found during in-game test (2026-07-28) — FIXED:** the bucket did nothing because the mixin
+> was never applied. `TargetMods.STORAGEDRAWERS` used mod id `"storagedrawers"` but SD declares
+> `@Mod(modid="StorageDrawers")`; `TargetModBuilder.isTargetPresent` matches case-sensitively, so
+> the entry was filtered out of the late-mixin set. Fixed to `"StorageDrawers"`. **Pending re-test.**
