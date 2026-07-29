@@ -81,15 +81,17 @@ public class ItemRendererTank implements IItemRenderer {
             float prevLY = OpenGlHelper.lastBrightnessY;
             OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, 240.0F, 240.0F);
 
-            // Draw the base frame + glass (same as the ISBRH's renderInventoryBlock).
-            ISBRH.renderInventoryBlock(block, 0, ModBlocks.tankRenderId, renderer);
-
-            // Reconstruct a transient TileTank from the portable NBT so all the existing read
-            // logic (fluid, capacity, trim level, attributes, seal, owner) is reused verbatim.
-            // worldObj stays null; readFromPortableNBT + the render helpers only touch portable
-            // state, so this is null-world-safe.
+            // Reconstruct a transient TileTank from the portable NBT FIRST, so we can pick the
+            // vending frame icon (and reuse all existing read logic: fluid, capacity, trim level,
+            // attributes, seal, owner). worldObj stays null; readFromPortableNBT + the render
+            // helpers only touch portable state, so this is null-world-safe.
             TileTank tile = new TileTank();
             tile.readFromPortableNBT(tag.getCompoundTag("Tile"));
+
+            // Draw the base frame + glass. Use the vending texture when the tank has a Creative
+            // Vending upgrade, mirroring BlockTankRenderer.renderWorldBlock's in-world check.
+            IIcon frameIcon = tile.isVending() ? block.getIconTankVending() : block.getIconTank();
+            ISBRH.renderInventoryFrame(block, frameIcon, renderer);
 
             // Fluid + overlays are drawn in block-local 0..1 space; wrap in a -0.5 translate to
             // center the model (matching renderInventoryBlock's own centering).

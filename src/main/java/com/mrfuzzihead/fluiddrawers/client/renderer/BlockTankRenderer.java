@@ -44,8 +44,18 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
     @Override
     public void renderInventoryBlock(Block block, int metadata, int modelId, RenderBlocks renderer) {
         if (!(block instanceof BlockTank)) return;
-        BlockTank tank = (BlockTank) block;
-        IIcon iconTank = tank.getIconTank();
+        // Default item icon: normal tank texture. The WAILA HUD path calls renderInventoryFrame
+        // directly with the vending texture when the live tank has a Creative Vending upgrade.
+        renderInventoryFrame((BlockTank) block, ((BlockTank) block).getIconTank(), renderer);
+    }
+
+    /**
+     * Renders the inventory/item-icon tank frame + glass with the given metal-frame icon. The
+     * default icon is {@link BlockTank#getIconTank()}; the WAILA HUD path passes
+     * {@link BlockTank#getIconTankVending()} when the live tank has a Creative Vending upgrade,
+     * mirroring {@link #renderWorldBlock}'s vending check on the in-world metal frame.
+     */
+    public void renderInventoryFrame(BlockTank tank, IIcon frameIcon, RenderBlocks renderer) {
         IIcon iconGlass = tank.getIconGlass();
 
         // The framework (RenderItem.renderBlockAsItem -> custom dispatch) calls us WITHOUT a
@@ -83,7 +93,7 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
         // No setBrightness: use the ambient/GUI lightmap (see comment above). renderFace* with
         // enableAO=false emits vertices carrying the per-face setColorOpaque_F directional shade
         // and the caller's lightmap current coord.
-        renderMetalFrame(tank, iconTank, renderer, 0.0, 0.0, 0.0);
+        renderMetalFrame(tank, frameIcon, renderer, 0.0, 0.0, 0.0);
         renderGlass(tank, iconGlass, renderer, 0.0, 0.0, 0.0);
         tess.draw();
 
