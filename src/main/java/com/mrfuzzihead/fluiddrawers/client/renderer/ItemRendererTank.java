@@ -102,6 +102,25 @@ public class ItemRendererTank implements IItemRenderer {
 
             OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, prevLX, prevLY);
         } else {
+            // Inventory (GUI + hotbar) icons must be full-bright regardless of the lightmap current
+            // coord. The first-person held-item path (ItemRenderer.renderItemInFirstPerson) sets the
+            // lightmap to the player's AMBIENT world light, and that state leaks past the hand render
+            // into the HUD hotbar (rendered after the hand), darkening the tank icon whenever ANY
+            // item is held -- an empty hand leaves the lightmap at GUI full-bright, which is why the
+            // tank only looks dark while holding something. Forcing full-bright here for the
+            // INVENTORY type only (save/restore) decouples the icon from that leak. The held-in-hand
+            // (EQUIPPED*) and dropped (ENTITY) types intentionally inherit the ambient lightmap
+            // (dark at night), matching the established design and the OpenBlocks pattern, and
+            // avoiding the "glows near-white in complete darkness" regression from the prior
+            // unconditional setBrightness(15728880) hardcode.
+            boolean inventoryFullBright = (type == IItemRenderer.ItemRenderType.INVENTORY);
+            float prevLX = 0.0F, prevLY = 0.0F;
+            if (inventoryFullBright) {
+                prevLX = OpenGlHelper.lastBrightnessX;
+                prevLY = OpenGlHelper.lastBrightnessY;
+                OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, 240.0F, 240.0F);
+            }
+
             // Draw the base frame + glass (same as the ISBRH's renderInventoryBlock).
             ISBRH.renderInventoryBlock(block, 0, ModBlocks.tankRenderId, renderer);
 
@@ -127,6 +146,10 @@ public class ItemRendererTank implements IItemRenderer {
                     tess.draw();
                     GL11.glTranslatef(0.5F, 0.5F, 0.5F);
                 }
+            }
+
+            if (inventoryFullBright) {
+                OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, prevLX, prevLY);
             }
         }
     }

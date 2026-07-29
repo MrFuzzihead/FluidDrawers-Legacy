@@ -1,6 +1,7 @@
 package com.mrfuzzihead.fluiddrawers.client.renderer;
 
 import net.minecraft.block.Block;
+import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.tileentity.TileEntity;
@@ -58,33 +59,41 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
     public void renderInventoryFrame(BlockTank tank, IIcon frameIcon, RenderBlocks renderer) {
         IIcon iconGlass = tank.getIconGlass();
 
-        // The framework (RenderItem.renderBlockAsItem -> custom dispatch) calls us WITHOUT a
-        // startDrawingQuads/draw wrapper and has already bound the block atlas + set up the
-        // isometric view (and blend, since getRenderBlockPass()==1). We manage tessellation
-        // ourselves and center the 0..1 model at the origin with a -0.5 translate.
+        // The framework dispatches us via ForgeHooksClient.renderInventoryItem, which binds the
+        // block atlas (for sprite number 0) and applies the isometric inventory transform, but does
+        // NOT enable GL_BLEND for the INVENTORY type (unlike the ENTITY path, and unlike vanilla
+        // RenderItem.renderItemIntoGUI's block path which the custom renderer replaces). So the
+        // glass's transparent pixels would otherwise render opaque in the hotbar/inventory. We
+        // replicate renderItemIntoGUI's blend + alphaFunc setup here (verified vs the decompiled
+        // RenderItem.java: for getRenderBlockPass()!=0 it does glEnable(GL_ALPHA_TEST),
+        // glAlphaFunc(GL_GREATER, 0.1F), glEnable(GL_BLEND), OpenGlHelper.glBlendFunc(770, 771, 1, 0)).
         //
-        // Brightness is NOT forced here. renderBlockAsItem does not set a brightness for the custom
-        // path, so the quads inherit the lightmap current coord set by each caller:
-        // - Inventory slot: GuiContainer sets setLightmapTextureCoords(240, 240) = full bright
-        // (GuiContainer:105-107), so the icon stays fully lit.
-        // - Held in hand: ItemRenderer.renderItemInFirstPerson sets the lightmap to the player's
-        // ambient world light (ItemRenderer:287-290), so the held tank is dark at night.
-        // - Dropped entity: ambient world light, so it is dark at night.
-        // Forcing setBrightness(15728880) here previously made the item glow full-bright (near-white
-        // in complete darkness) in the hand and on the ground. Per-face directional shading
-        // (setColorOpaque_F in drawBox) is still applied for the 3D look. Matches the OpenBlocks
-        // pattern (BlockProjectorRenderer / ItemRendererTank do not force item brightness).
+        // Brightness is NOT forced here. The quads inherit the lightmap current coord set by each
+        // caller: inventory slot uses GuiContainer's full-bright (240, 240); held-in-hand uses the
+        // player's ambient world light (dark at night); dropped entity uses ambient. ItemRendererTank
+        // additionally forces full-bright for the INVENTORY type only, to shield the hotbar icon from
+        // the ambient lightmap that the first-person hand leaves leaked into the HUD pass. Forcing
+        // setBrightness(15728880) here unconditionally previously made the held/dropped item glow
+        // near-white in complete darkness. Per-face directional shading (setColorOpaque_F in drawBox)
+        // is still applied for the 3D look. Matches the OpenBlocks pattern (no forced item brightness
+        // in the shared render path).
         Tessellator tess = Tessellator.instance;
         boolean prevAO = renderer.enableAO;
         renderer.enableAO = false;
 
-        // The held-in-hand codepath (ItemRenderer.renderItemInFirstPerson) calls renderBlockAsItem
-        // with depth-write DISABLED (glDepthMask(false)) for any block whose getRenderBlockPass()
-        // != 0 -- see ItemRenderer.java:95. With depth-write off our opaque metal frame loses
-        // occlusion, so the corner posts (drawn after the top slab) bleed through the top face.
-        // Re-enable depth-write for our render and restore the caller's state afterwards. The
-        // inventory-slot path leaves depth-write on, so this save/restore is a no-op there.
-        boolean prevDepthMask = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
+        // Scope {blend, blendFunc, alphaTest, alphaFunc, depthMask, colorWrite} so the caller's
+        // state is restored exactly -- no GL-state leak into later fullscreen passes (a rare
+        // white-bar flash was observed when this state churned unsymmetrically). The held-in-hand
+        // codepath (ItemRenderer.renderItem) sets glDepthMask(false) for any block whose
+        // getRenderBlockPass()!=0; with depth-write off our opaque metal frame loses occlusion and
+        // the corner posts (drawn after the top slab) bleed through the top face. We force
+        // depth-write on here. The inventory-slot path leaves these already-on, so this is a no-op
+        // there. Matches the SD TileEntityDrawersRenderer glPushAttrib pattern.
+        GL11.glPushAttrib(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
+        GL11.glEnable(GL11.GL_ALPHA_TEST);
+        GL11.glAlphaFunc(GL11.GL_GREATER, 0.1F);
+        GL11.glEnable(GL11.GL_BLEND);
+        OpenGlHelper.glBlendFunc(770, 771, 1, 0); // GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA (mirrors renderItemIntoGUI)
         GL11.glDepthMask(true);
 
         GL11.glTranslatef(-0.5F, -0.5F, -0.5F);
@@ -99,7 +108,9 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
 
         GL11.glTranslatef(0.5F, 0.5F, 0.5F);
 
-        GL11.glDepthMask(prevDepthMask);
+        // Reset the current color so a tinted color state cannot leak into a later pass.
+        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        GL11.glPopAttrib();
         renderer.setRenderBounds(0.0, 0.0, 0.0, 1.0, 1.0, 1.0);
         renderer.enableAO = prevAO;
     }

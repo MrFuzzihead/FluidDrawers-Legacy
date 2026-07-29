@@ -300,3 +300,35 @@ User reported 3 findings after testing Phase 7. All investigated against decompi
 - **SD-faithful dispatcher slot:** The shroud branch is inserted after the lock-key branch and before the personal-key branch, matching SD 1.7.10 `BlockDrawers.onBlockActivated` ordering (`upgradeLock → shroudKey → quantifyKey → personalKey`). Security-first (`SecurityManager.hasAccess`) runs before any held-item branch, so a non-owner cannot toggle concealment.
 - **`markBlockForUpdate`, not a static-mesh refresh:** The fluid is drawn by the dynamic TESR (`RenderTileTank`), which re-reads `isConcealed()` every frame from the synced client TE. So `markBlockForUpdate` (triggering `getDescriptionPacket` → `onDataPacket` → `readFromNBT`) is sufficient for an immediate re-render -- unlike the Phase 10 vending texture swap / Phase 11 overlays which live in the static `BlockTankRenderer` mesh and also needed `markBlockForUpdate`.
 - **No new lang keys:** The Concealment Key item's name/tooltip come from SD's own lang (`item.shroudKey.*`). The toggle branch is silent (no chat message), matching the existing lock-key branch in the dispatcher; the visual fluid hide/show is the user feedback.
+
+## Post-Phase 15 findings — item-icon GL/render audit (2026-07-29)
+
+Audited all GL-state churn in the item/TE render paths (`BlockTankRenderer.renderInventoryFrame`, `ItemRendererTank.renderItem`, `RenderTileTank.renderFluid`/`renderQuantityLabel`, `BlockTankRenderer.renderInventoryOverlays`) against the decompiled vanilla source (`RenderItem.java`, `ItemRenderer.java`, `ForgeHooksClient.java` in `build/rfg/minecraft-src`). Three findings fixed.
+
+### Finding 4 — Tank icon darker when holding any item (hotbar/inventory only)
+- **Symptom:** with the tank in a hotbar slot, selecting any other slot that holds an item (bucket, pickaxe, another tank) makes the tank icon render darker; selecting an empty-hand slot renders it normal brightness.
+- **Root cause (verified):** `ItemRenderer.renderItemInFirstPerson` sets the lightmap to the player's **ambient** world light (dark at night/in caves). That lightmap state **leaks past the first-person hand render into the HUD hotbar pass** (the hotbar is drawn after the hand in the same frame). Because the custom `ItemRendererTank` is registered (`ClientProxy:33`), the GUI/hotbar path is `ForgeHooksClient.renderInventoryItem` → our `renderItem(INVENTORY)`, and `renderInventoryFrame` did NOT reset the lightmap, so the tank icon inherited the leaked dark ambient. With an empty hand, the hand path leaves the lightmap at GUI full-bright, hence the symptom only appears while holding something.
+- **Fix:** `ItemRendererTank.renderItem` now saves `OpenGlHelper.lastBrightnessX/Y`, forces `setLightmapTextureCoords(lightmapTexUnit, 240, 240)` (GUI full-bright), and restores — gated to `type == ItemRenderType.INVENTORY` only. The `EQUIPPED*`/`ENTITY` types still inherit the ambient lightmap (dark at night), preserving the established design (Finding 3) and avoiding the prior "glows near-white in darkness" regression.
+
+### Finding 5 — Glass renders opaque in the hotbar/item form
+- **Symptom:** the `minecraft:glass` interior of the tank item icon is opaque (no alpha) in the hotbar/inventory, instead of see-through.
+- **Root cause (verified):** the custom `ItemRendererTank` replaces vanilla `RenderItem.renderItemIntoGUI`. `ForgeHooksClient.renderInventoryItem` binds the block atlas (line 161) but does **NOT** enable `GL_BLEND` for the INVENTORY type (unlike the ENTITY path, lines 117-122). Vanilla `renderItemIntoGUI` would have enabled `GL_BLEND` + `glAlphaFunc(GL_GREATER, 0.1F)` + `OpenGlHelper.glBlendFunc(770, 771, 1, 0)` for a block with `getRenderBlockPass()!=0` (verified in the decompiled source), but that whole path is skipped because the custom renderer handles INVENTORY. `renderInventoryFrame` never enabled blend either → the glass's transparent pixels rendered opaque.
+- **Fix:** `renderInventoryFrame` now replicates `renderItemIntoGUI`'s blend setup exactly: `glEnable(GL_ALPHA_TEST)`, `glAlphaFunc(GL_GREATER, 0.1F)`, `glEnable(GL_BLEND)`, `OpenGlHelper.glBlendFunc(770, 771, 1, 0)`.
+
+### Finding 6 — GL-state leak (rare white bar flash)
+- **Symptom:** an intermittent white bar flashes across the screen, most reproducible when the hotbar tank renders with an empty hand; also seen rarely during general play.
+- **Root cause / leak surface:** `renderInventoryFrame` previously toggled `GL_DEPTH_WRITEMASK` by hand and relied on the caller's blend state — unsymmetric and fragile (any caller that left blend/alphaFunc in an unexpected state could bleed into a later fullscreen pass). The TESR (`renderFluid`) and `renderQuantityLabel` were already symmetric on audit.
+- **Fix:** `renderInventoryFrame` now scopes all color-buffer + depth-buffer GL state with `glPushAttrib(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)` / `glPopAttrib()` (the SD `TileEntityDrawersRenderer` pattern), so `{blend, blendFunc, alphaTest, alphaFunc, depthMask, colorWrite}` are restored exactly to the caller's state. This both fixes the glass (Finding 5) and removes the leak surface. A defensive `glColor4f(1,1,1,1)` reset is added before `glPopAttrib` so a tinted current-color cannot leak either. `prevDepthMask` manual save/restore is removed (subsumed by the attrib push).
+
+### Build verification
+| Date       | Check                     | Result                                                                                                                        |
+|------------|---------------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| 2026-07-29 | `./gradlew spotlessApply` | **PASS** (import order fixed)                                                                                                 |
+| 2026-07-29 | `./gradlew build -x test` | **PASS** (BUILD SUCCESSFUL; `:compileJava`, `:spotlessJavaCheck`, `:checkstyleMain`, `:jar`, `:reobfJar`, `:build` all clean) |
+
+### Manual re-tests (require `runClient`)
+1. **Hotbar brightness:** put a tank in slot 1; select slot 2 holding a bucket/pickaxe/another tank → the slot-1 tank icon should now be normal brightness (not darker). Select an empty-hand slot → still normal. Should match regardless of held item.
+2. **Glass alpha:** the tank item icon (hotbar + creative inventory) should show the see-through glass interior (back of the frame visible through the glass), not an opaque pane.
+3. **White-bar leak:** fill/drain repeatedly (water + lava), switch hotbar slots with empty + held hand, open/close inventory — watch for any white flash. Should be gone; if it recurs the next suspect is the lightmap current-coord interaction with a later fullscreen pass (still noted in Finding 2).
+4. **No regression — dark-at-night hand/drop:** at night, hold the tank + drop one → both should still be ambient-dark (not glowing near-white), preserving Finding 3's fix.
+
