@@ -190,6 +190,21 @@ public class TileTank extends TileEntity implements FluidDrawerHost, IFluidHandl
         return Math.max(multiplier, 1);
     }
 
+    /**
+     * Returns the highest storage-upgrade metadata level installed (for the storage-trim
+     * overlay). 0 if no storage upgrade is installed.
+     */
+    public int getStorageTrimLevel() {
+        int maxLevel = 0;
+        for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
+            ItemStack upgrade = upgradeData.getUpgrade(i);
+            if (upgrade != null && DrawerUpgradable.isStorageUpgrade(upgrade)) {
+                maxLevel = Math.max(maxLevel, upgrade.getItemDamage());
+            }
+        }
+        return maxLevel;
+    }
+
     @Override
     public SimpleDrawerAttributes getAttributes() {
         return attributes;

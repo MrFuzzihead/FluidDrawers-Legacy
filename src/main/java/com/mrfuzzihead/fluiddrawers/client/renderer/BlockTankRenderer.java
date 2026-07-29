@@ -10,6 +10,7 @@ import net.minecraftforge.client.ForgeHooksClient;
 
 import org.lwjgl.opengl.GL11;
 
+import com.jaquadro.minecraft.storagedrawers.api.storage.attribute.LockAttribute;
 import com.mrfuzzihead.fluiddrawers.block.BlockTank;
 import com.mrfuzzihead.fluiddrawers.init.ModBlocks;
 import com.mrfuzzihead.fluiddrawers.tile.TileTank;
@@ -118,6 +119,12 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
             renderMetalFrame(tank, iconTank, renderer, x, y, z);
         } else if (pass == 1) {
             renderGlass(tank, iconGlass, renderer, x, y, z);
+            // Overlays drawn in the alpha pass so transparent icon pixels don't occlude the
+            // frame/fluid behind them. Ports the 1.12.2 seal_part/lock_part/void_part submodels
+            // + adds SD 1.7.10 claim icons + storage-trim overlays.
+            if (te instanceof TileTank) {
+                renderOverlays(tank, (TileTank) te, renderer, x, y, z);
+            }
         }
 
         renderer.setRenderBounds(0.0, 0.0, 0.0, 1.0, 1.0, 1.0);
@@ -213,6 +220,122 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
             true,
             true,
             true);
+    }
+
+    // --- Phase 11/10 overlay rendering ---
+
+    private void renderOverlays(BlockTank tank, TileTank tile, RenderBlocks renderer, double x, double y, double z) {
+        Tessellator tess = Tessellator.instance;
+        tess.setColorOpaque_F(1.0F, 1.0F, 1.0F);
+
+        // Full-face overlays: seal/tape + storage trim (drawn slightly outside the block).
+        if (tile.isSealed()) {
+            drawFullFaceOverlay(renderer, tank, tank.getIconTape(), x, y, z);
+        }
+        int trimLevel = tile.getStorageTrimLevel();
+        if (trimLevel >= 2) {
+            IIcon trimIcon = tank.getIconTrim(trimLevel);
+            if (trimIcon != null) {
+                drawFullFaceOverlay(renderer, tank, trimIcon, x, y, z);
+            }
+        }
+
+        // Small indicator icons: lock/claim (top-center) + void (top-corner).
+        boolean locked = tile.getAttributes()
+            .isItemLocked(LockAttribute.LOCK_POPULATED)
+            || tile.getAttributes()
+                .isItemLocked(LockAttribute.LOCK_EMPTY);
+        boolean hasOwner = tile.getOwner() != null;
+        if (locked || hasOwner) {
+            IIcon icon;
+            if (locked && hasOwner) icon = tank.getIconClaimLock();
+            else if (locked) icon = tank.getIconLock();
+            else icon = tank.getIconClaim();
+            // Lock/claim: centered on each side (1.12.2 lock_part.json: x/z 7.25-8.75, y 14.25-15.75)
+            double c = 7.25 * U, d = 8.75 * U;
+            drawIconQuads(tess, icon, x, y, z, c, d, c, d, c, d, c, d, 14.25 * U, 15.75 * U);
+        }
+        if (tile.getAttributes()
+            .isVoid()) {
+            // Void: corner of each side (1.12.2 void_part.json: N x=0.25-1.75, S x=14.25-15.75, etc.)
+            drawIconQuads(
+                tess,
+                tank.getIconVoid(),
+                x,
+                y,
+                z,
+                0.25 * U,
+                1.75 * U, // N: left corner
+                14.25 * U,
+                15.75 * U, // S: right corner
+                14.25 * U,
+                15.75 * U, // W: back corner
+                0.25 * U,
+                1.75 * U, // E: front corner
+                14.25 * U,
+                15.75 * U);
+        }
+    }
+
+    /**
+     * Draws a full-face overlay (tape or storage trim) on all 4 side faces, slightly outside the
+     * block to avoid z-fighting. Uses RenderBlocks.renderFace* which maps the full-block face
+     * (0..1) to the full icon UV.
+     */
+    private void drawFullFaceOverlay(RenderBlocks renderer, Block block, IIcon icon, double x, double y, double z) {
+        Tessellator tess = Tessellator.instance;
+        tess.setColorOpaque_F(1.0F, 1.0F, 1.0F);
+        double off = 0.003;
+        renderer.setRenderBounds(0, 0, -off, 1, 1, 1);
+        renderer.renderFaceZNeg(block, x, y, z, icon);
+        renderer.setRenderBounds(0, 0, 0, 1, 1, 1 + off);
+        renderer.renderFaceZPos(block, x, y, z, icon);
+        renderer.setRenderBounds(-off, 0, 0, 1, 1, 1);
+        renderer.renderFaceXNeg(block, x, y, z, icon);
+        renderer.setRenderBounds(0, 0, 0, 1 + off, 1, 1);
+        renderer.renderFaceXPos(block, x, y, z, icon);
+    }
+
+    /**
+     * Draws small indicator-icon quads on all 4 side faces with the full icon UV mapped to each
+     * small quad (RenderBlocks.renderFace* can't do this -- it maps UV from block position).
+     * Positions ported from the 1.12.2 lock_part.json / void_part.json (in 1/16th units).
+     *
+     * <p>
+     * IMPORTANT: this is called from {@link #renderWorldBlock}, which runs inside the chunk
+     * renderer's already-open Tessellator batch. We must only add vertices -- calling
+     * startDrawingQuads/draw here would crash with "Already tesselating!". The chunk renderer
+     * opened the batch and will draw it.
+     */
+    private void drawIconQuads(Tessellator tess, IIcon icon, double x, double y, double z, double nxMin, double nxMax,
+        double sxMin, double sxMax, double wzMin, double wzMax, double ezMin, double ezMax, double yMin, double yMax) {
+        double off = 0.003;
+        double uMin = icon.getMinU(), uMax = icon.getMaxU();
+        double vMin = icon.getMinV(), vMax = icon.getMaxV();
+
+        // North face (-Z) -- 4 vertices = 1 quad, added to the chunk renderer's open batch.
+        tess.addVertexWithUV(x + nxMin, y + yMin, z - off, uMin, vMax);
+        tess.addVertexWithUV(x + nxMax, y + yMin, z - off, uMax, vMax);
+        tess.addVertexWithUV(x + nxMax, y + yMax, z - off, uMax, vMin);
+        tess.addVertexWithUV(x + nxMin, y + yMax, z - off, uMin, vMin);
+
+        // South face (+Z)
+        tess.addVertexWithUV(x + sxMin, y + yMin, z + 1 + off, uMin, vMax);
+        tess.addVertexWithUV(x + sxMin, y + yMax, z + 1 + off, uMin, vMin);
+        tess.addVertexWithUV(x + sxMax, y + yMax, z + 1 + off, uMax, vMin);
+        tess.addVertexWithUV(x + sxMax, y + yMin, z + 1 + off, uMax, vMax);
+
+        // West face (-X)
+        tess.addVertexWithUV(x - off, y + yMin, z + wzMin, uMin, vMax);
+        tess.addVertexWithUV(x - off, y + yMin, z + wzMax, uMax, vMax);
+        tess.addVertexWithUV(x - off, y + yMax, z + wzMax, uMax, vMin);
+        tess.addVertexWithUV(x - off, y + yMax, z + wzMin, uMin, vMin);
+
+        // East face (+X)
+        tess.addVertexWithUV(x + 1 + off, y + yMin, z + ezMin, uMin, vMax);
+        tess.addVertexWithUV(x + 1 + off, y + yMax, z + ezMin, uMin, vMin);
+        tess.addVertexWithUV(x + 1 + off, y + yMax, z + ezMax, uMax, vMin);
+        tess.addVertexWithUV(x + 1 + off, y + yMin, z + ezMax, uMax, vMax);
     }
 
     /**

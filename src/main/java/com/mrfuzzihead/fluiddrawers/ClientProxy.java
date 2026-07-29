@@ -1,6 +1,10 @@
 package com.mrfuzzihead.fluiddrawers;
 
+import net.minecraft.item.Item;
+import net.minecraftforge.client.MinecraftForgeClient;
+
 import com.mrfuzzihead.fluiddrawers.client.renderer.BlockTankRenderer;
+import com.mrfuzzihead.fluiddrawers.client.renderer.ItemRendererTank;
 import com.mrfuzzihead.fluiddrawers.client.tesr.RenderTileTank;
 import com.mrfuzzihead.fluiddrawers.init.ModBlocks;
 import com.mrfuzzihead.fluiddrawers.tile.TileTank;
@@ -23,5 +27,9 @@ public class ClientProxy extends CommonProxy {
 
         // Bind the fluid TESR (Phase 7) -- draws the stored fluid inside the glass frame.
         ClientRegistry.bindTileEntitySpecialRenderer(TileTank.class, new RenderTileTank());
+
+        // Register the custom item renderer (Phase 11/12 overlay fix) -- shows the tape overlay
+        // on sealed tank items in inventory/hand/dropped (1.12.2 tank_sealed.json equivalent).
+        MinecraftForgeClient.registerItemRenderer(Item.getItemFromBlock(ModBlocks.TANK), new ItemRendererTank());
     }
 }

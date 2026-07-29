@@ -140,11 +140,15 @@ The 1.12.2 source is layered on three things that **do not exist in 1.7.10** and
 - **In-game test:** Apply quantify key → floating "Water / 1,000 mB" appears on the tank sides; updates on fill/drain.
 - **Depends on:** 7, 10.
 
-### Phase 15 -- Config GUI *(optional, low priority)*
-- **Goal:** In-mod config screen for the three config values.
-- **Touches:** `client/handler/ConfigGuiHandler` → Forge 1.7.10 `GuiConfig`/`GuiFactory`.
-- **In-game test:** Mods list → Fluid Drawers → Config → edit `baseCapacity` etc.; takes effect.
-- **Depends on:** 4.
+### Phase 15 -- Concealment key (concealment key) *(optional polish)*
+- **Goal:** Concealment key toggles hiding the fluid.
+- **Touches:** I don't know
+- **In-game test:** Apply concealment key → fluid not visible when toggled on, visible when toggled off.
+- **Depends on:** 7, 10.
+
+### STRETCH GOALS
+- Framed Tank
+- Controller integration
 
 ## 5. Risks / "verify, don't guess" list (flagged for compile-driven discovery)
 - **Material/SoundType mapping** for `BlockTank` (1.12.2 `Material.field_151573_f`, `SoundType.field_185852_e`) → confirm via decompiled 1.12.2 (default `Material.glass` + glass sound).

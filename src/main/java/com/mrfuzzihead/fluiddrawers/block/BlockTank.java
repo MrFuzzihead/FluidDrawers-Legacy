@@ -45,6 +45,25 @@ public class BlockTank extends Block implements ITileEntityProvider {
     @SideOnly(Side.CLIENT)
     private IIcon iconGlass;
 
+    // Phase 11/10 overlays (were never rendered -- fixed now). These reuse StorageDrawers'
+    // overlay textures (SD is a hard dependency so the textures are always stitched).
+    @SideOnly(Side.CLIENT)
+    private IIcon iconTape;
+    @SideOnly(Side.CLIENT)
+    private IIcon iconLock;
+    @SideOnly(Side.CLIENT)
+    private IIcon iconClaim;
+    @SideOnly(Side.CLIENT)
+    private IIcon iconClaimLock;
+    @SideOnly(Side.CLIENT)
+    private IIcon iconVoid;
+    @SideOnly(Side.CLIENT)
+    private IIcon[] iconTrim;
+
+    // Storage-trim overlay names matching SD 1.7.10 BlockDrawers (indices 2-8 = upgrade metadata).
+    private static final String[] STORAGE_OVERLAYS = { null, null, "iron", "gold", "obsidian", "diamond", "emerald",
+        "ruby", "tanzanite" };
+
     public BlockTank() {
         super(Material.iron);
         this.isBlockContainer = true;
@@ -319,6 +338,16 @@ public class BlockTank extends Block implements ITileEntityProvider {
         this.iconTankVending = reg.registerIcon("fluiddrawers:tank_vending");
         // Vanilla glass block texture (1.12.2 model references "minecraft:blocks/glass").
         this.iconGlass = reg.registerIcon("minecraft:glass");
+        // Overlay textures from StorageDrawers (SD is a hard dependency).
+        this.iconTape = reg.registerIcon("storagedrawers:tape");
+        this.iconLock = reg.registerIcon("storagedrawers:indicator/lock_icon");
+        this.iconClaim = reg.registerIcon("storagedrawers:indicator/claim_icon");
+        this.iconClaimLock = reg.registerIcon("storagedrawers:indicator/claim_lock_icon");
+        this.iconVoid = reg.registerIcon("storagedrawers:indicator/void_icon");
+        this.iconTrim = new IIcon[STORAGE_OVERLAYS.length];
+        for (int i = 2; i < STORAGE_OVERLAYS.length; i++) {
+            this.iconTrim[i] = reg.registerIcon("storagedrawers:overlay_" + STORAGE_OVERLAYS[i]);
+        }
     }
 
     @Override
@@ -340,5 +369,40 @@ public class BlockTank extends Block implements ITileEntityProvider {
     @SideOnly(Side.CLIENT)
     public IIcon getIconGlass() {
         return iconGlass;
+    }
+
+    @SideOnly(Side.CLIENT)
+    public IIcon getIconTape() {
+        return iconTape;
+    }
+
+    @SideOnly(Side.CLIENT)
+    public IIcon getIconLock() {
+        return iconLock;
+    }
+
+    @SideOnly(Side.CLIENT)
+    public IIcon getIconClaim() {
+        return iconClaim;
+    }
+
+    @SideOnly(Side.CLIENT)
+    public IIcon getIconClaimLock() {
+        return iconClaimLock;
+    }
+
+    @SideOnly(Side.CLIENT)
+    public IIcon getIconVoid() {
+        return iconVoid;
+    }
+
+    /**
+     * Returns the storage-trim overlay icon for the given upgrade metadata level, or null if
+     * there is no trim for that level.
+     */
+    @SideOnly(Side.CLIENT)
+    public IIcon getIconTrim(int level) {
+        if (level < 2 || level >= iconTrim.length) return null;
+        return iconTrim[level];
     }
 }
