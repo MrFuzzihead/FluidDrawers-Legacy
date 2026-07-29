@@ -210,11 +210,12 @@ public abstract class MixinTileEntityController extends TileEntity implements IF
             || FluidContainerRegistry.isEmptyContainer(held);
         if (!isFluidContainer) return;
 
+        boolean transferred = false;
         if (!worldObj.isRemote) {
             // bypass=false: the controller's IFluidHandler respects lock/void rules, matching the
             // 1.12.2 controller (which had no bypass path). ForgeDirection.UNKNOWN because the
             // controller routes to all connected tanks regardless of the clicked side.
-            boolean transferred = BlockInteractionUtils
+            transferred = BlockInteractionUtils
                 .transferFluid((IFluidHandler) this, player, held, ForgeDirection.UNKNOWN, false);
             // This inject runs server-side only (BlockController calls interactPutItemsIntoInventory
             // solely when !world.isRemote), so the client never predicts the inventory change —
@@ -227,9 +228,16 @@ public abstract class MixinTileEntityController extends TileEntity implements IF
                 ((EntityPlayerMP) player).sendContainerToPlayer(player.inventoryContainer);
             }
         }
-        // Always cancel for fluid containers (even on a failed transfer) so a bucket is never stored
-        // as an item in the controller's drawers — matches the 1.12.2 unconditional cancel.
-        cir.setReturnValue(0);
+        // Cancel for fluid containers when a transfer actually happened, so the bucket is
+        // never stored as an item in the controller's drawers. If the transfer failed (e.g.
+        // tanks full when filling, or tanks empty when draining), fall through to SD's fallback
+        // item-insertion — a player might want to store an empty or full bucket as an item in
+        // a normal drawer connected to the controller. This is friendlier UX than the 1.12.2
+        // FD approach (which always cancels), and the fluid-routing priority is retained:
+        // fluid tanks get first dibs, item drawers are the fallback.
+        if (transferred) {
+            cir.setReturnValue(0);
+        }
     }
 
     // ------------------------------------------------------------------
