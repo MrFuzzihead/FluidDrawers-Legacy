@@ -241,3 +241,28 @@ User reported 3 findings after testing Phase 7. All investigated against decompi
 | (today) | `./gradlew build`               | **PASS** (BUILD SUCCESSFUL, 6s; compileJava + spotlessJavaCheck pass)                                        |
 | (today) | `./gradlew runClient` (startup) | **PASS** (client launched, no crash, recipe registered)                                                      |
 | (today) | In-game: craft tank per recipe  | **PASS** (craft Tank Fluid Tank from recipe; should also show in NEI — NEI runtime dep, recipe auto-exposed) |
+
+## Phase 15 — Concealment key (shroud key)
+
+| Date       | Check                                           | Result                                                                                                                                                                                                                             |
+|------------|-------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 2026-07-29 | `BlockTank.java` shroud-key branch added        | **DONE** (`ModItems.shroudKey` branch in held-item dispatcher: `setConcealed(!isConcealed())` + `world.markBlockForUpdate`; slot after lock, before personal key -- SD order lock→shroud→quantify→personal)                        |
+| 2026-07-29 | Pre-existing infra verified (no changes needed) | **DONE** (`SimpleDrawerAttributes.concealed`/`isConcealed`/`setConcealed` + NBT ser/des from Phase 4; `RenderTileTank.renderFluid` gate `if (isConcealed()) return` from Phase 7; TE sync carries `"Attributes"` from Phases 6/12) |
+| 2026-07-29 | `./gradlew spotlessApply`                       | **PASS** (reformatted the new branch to project style)                                                                                                                                                                             |
+| 2026-07-29 | `./gradlew build`                               | **PASS** (BUILD SUCCESSFUL, 8s; `:compileJava` + `:spotlessJavaCheck` clean; mixin refmap written)                                                                                                                                 |
+| 2026-07-29 | Dedicated-server gate                           | **N/A** (no new sync/proxy/GUI code; the branch mutates already-synced TE attribute state and calls the already-used `markBlockForUpdate` path; `BlockTank.onBlockActivated` is server-safe, no client-only classes touched)       |
+
+### Phase 15 behavior checks (require manual in-game verification)
+
+1. **Conceal (hide fluid):** Fill a tank with water → right-click with the Concealment Key → the water fluid sprite disappears inside the glass frame (TESR skips `renderFluid`). *(PENDING manual test)*
+2. **Reveal (show fluid):** Right-click the concealed tank again with the Concealment Key → the water re-appears at the correct fill level (no chunk reload needed; `markBlockForUpdate` → description packet → client TESR re-reads `isConcealed()`). *(PENDING manual test)*
+3. **Persistence across save/reload:** Conceal a tank → save & quit → reload → fluid still hidden. *(PENDING manual test)*
+4. **Sealed break/place preserves concealed state:** Conceal a tank + tape-seal it → break → place → concealed state restored (carried in the `"Attributes"` portable NBT). *(PENDING manual test)*
+5. **Security:** Set ownership with a personal key, then have a second player try to toggle concealment → blocked (security-first guard). *(PENDING manual test)*
+
+### Key design decisions
+
+- **Reusing the 1.12.2 attribute model, not SD's `IShroudable`:** SD 1.7.10 exposes `IShroudable` (`isShrouded`/`setIsShrouded`), but the 1.12.2 FD source models concealment as a plain `concealed` boolean on `SimpleDrawerAttributes` (read by `RenderTileTank` as `isConcealed()`). The standalone `SimpleDrawerAttributes` (SD GTNH 2.2.26 lacks the unified `IDrawerAttributes` interface) already had this field + getter/setter + NBT from Phase 4, and `RenderTileTank` already gated on it from Phase 7. Phase 15 therefore only wires the toggle; it does not add a new attribute or interface, keeping the surface minimal.
+- **SD-faithful dispatcher slot:** The shroud branch is inserted after the lock-key branch and before the personal-key branch, matching SD 1.7.10 `BlockDrawers.onBlockActivated` ordering (`upgradeLock → shroudKey → quantifyKey → personalKey`). Security-first (`SecurityManager.hasAccess`) runs before any held-item branch, so a non-owner cannot toggle concealment.
+- **`markBlockForUpdate`, not a static-mesh refresh:** The fluid is drawn by the dynamic TESR (`RenderTileTank`), which re-reads `isConcealed()` every frame from the synced client TE. So `markBlockForUpdate` (triggering `getDescriptionPacket` → `onDataPacket` → `readFromNBT`) is sufficient for an immediate re-render -- unlike the Phase 10 vending texture swap / Phase 11 overlays which live in the static `BlockTankRenderer` mesh and also needed `markBlockForUpdate`.
+- **No new lang keys:** The Concealment Key item's name/tooltip come from SD's own lang (`item.shroudKey.*`). The toggle branch is silent (no chat message), matching the existing lock-key branch in the dispatcher; the visual fluid hide/show is the user feedback.

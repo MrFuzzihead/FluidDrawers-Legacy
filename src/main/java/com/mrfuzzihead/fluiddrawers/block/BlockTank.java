@@ -284,6 +284,24 @@ public class BlockTank extends Block implements ITileEntityProvider, INetworked 
                 }
                 return true;
             }
+            // Concealment (shroud) key: toggle the concealed attribute, which hides the stored
+            // fluid from the in-world TESR (RenderTileTank.renderFluid early-returns when
+            // isConcealed()). Matches SD 1.7.10 BlockDrawers: setIsShrouded(!isShrouded()).
+            // markBlockForUpdate pushes the attribute change to the client via the description
+            // packet so the TESR re-renders immediately (the fluid quads are a dynamic TESR,
+            // but the client TE only learns of the toggle through the synced "Attributes" NBT).
+            // Slot per section 4 dispatcher: after lock, before personal key (SD order:
+            // lock → shroud → quantify → personal). Security-first guard already ran above.
+            if (heldItem.getItem() == ModItems.shroudKey) {
+                if (!world.isRemote) {
+                    tile.getAttributes()
+                        .setConcealed(
+                            !tile.getAttributes()
+                                .isConcealed());
+                    world.markBlockForUpdate(x, y, z);
+                }
+                return true;
+            }
             // Personal key: toggle ownership
             if (heldItem.getItem() instanceof ItemPersonalKey) {
                 if (!world.isRemote) {

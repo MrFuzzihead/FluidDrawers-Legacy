@@ -158,6 +158,10 @@ public class ItemBlockTank extends ItemBlock {
             if (lockAttrs != null && !lockAttrs.isEmpty()) {
                 list.add(EnumChatFormatting.GRAY + StatCollector.translateToLocal("fluiddrawers.tooltip.locked"));
             }
+            // --- Concealment (shroud) status ---
+            if (attrsTag.getBoolean("concealed")) {
+                list.add(EnumChatFormatting.GRAY + StatCollector.translateToLocal("fluiddrawers.tooltip.concealed"));
+            }
         }
     }
 }
