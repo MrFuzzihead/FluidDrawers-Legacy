@@ -3,6 +3,7 @@ package com.mrfuzzihead.fluiddrawers.integration;
 import java.util.List;
 
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
@@ -13,6 +14,7 @@ import net.minecraftforge.fluids.FluidStack;
 import com.jaquadro.minecraft.storagedrawers.api.storage.attribute.LockAttribute;
 import com.mrfuzzihead.fluiddrawers.block.BlockTank;
 import com.mrfuzzihead.fluiddrawers.drawers.FluidDrawer;
+import com.mrfuzzihead.fluiddrawers.init.ModBlocks;
 import com.mrfuzzihead.fluiddrawers.tile.TileTank;
 
 import mcp.mobius.waila.api.IWailaConfigHandler;
@@ -33,7 +35,26 @@ public final class WailaIntegration {
 
         @Override
         public ItemStack getWailaStack(IWailaDataAccessor accessor, IWailaConfigHandler config) {
-            return null;
+            TileEntity tile = accessor.getTileEntity();
+            if (!(tile instanceof TileTank)) {
+                return null;
+            }
+            TileTank tank = (TileTank) tile;
+
+            // Build a transient tank item carrying the live tile's portable NBT (the same "Tile"
+            // subtag format BlockTank.getDrops writes for sealed tanks) plus a "WailaLive" marker.
+            // The item renderer (ItemRendererTank) reads the marker and renders the current fluid +
+            // seal/trim/lock/void overlays so the WAILA HUD mirrors the in-world tank instead of a
+            // clear-slate empty tank. The accessor's tile is the synced client-side TE (full NBT
+            // via the description packet), so fluid/upgrades/attributes/owner are all present.
+            ItemStack stack = new ItemStack(Item.getItemFromBlock(ModBlocks.TANK), 1, 0);
+            NBTTagCompound tag = new NBTTagCompound();
+            NBTTagCompound tileTag = new NBTTagCompound();
+            tank.writeToPortableNBT(tileTag);
+            tag.setTag("Tile", tileTag);
+            tag.setBoolean("WailaLive", true);
+            stack.setTagCompound(tag);
+            return stack;
         }
 
         @Override

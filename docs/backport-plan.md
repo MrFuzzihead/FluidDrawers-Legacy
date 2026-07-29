@@ -149,9 +149,9 @@ The 1.12.2 source is layered on three things that **do not exist in 1.7.10** and
 ### STRETCH GOALS
 - Framed Tank
 - ~~Controller integration~~
-- FCD compat
+- ~~FCD compat NOT NEEDED~~
 - ~~Waila integration~~
-- Test piping integration
+- ~~Test piping integration~~
 
 ## 5. Risks / "verify, don't guess" list (flagged for compile-driven discovery)
 - **Material/SoundType mapping** for `BlockTank` (1.12.2 `Material.field_151573_f`, `SoundType.field_185852_e`) → confirm via decompiled 1.12.2 (default `Material.glass` + glass sound).

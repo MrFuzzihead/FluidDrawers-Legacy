@@ -35,6 +35,12 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
 
     private static final double U = 1.0 / 16.0;
 
+    // Packed full-bright brightness (skyLight=15, blockLight=15): (15 << 20) | (15 << 4). Used
+    // for the item-icon overlay path (WAILA HUD) where there is no world to sample brightness
+    // from; raw addVertexWithUV quads would otherwise render solid black (the classic 1.7.10
+    // TESR brightness trap). Matches RenderTileTank.FULL_BRIGHT.
+    private static final int FULL_BRIGHT = 0x00F000F0;
+
     @Override
     public void renderInventoryBlock(Block block, int metadata, int modelId, RenderBlocks renderer) {
         if (!(block instanceof BlockTank)) return;
@@ -275,6 +281,92 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
                 14.25 * U,
                 15.75 * U);
         }
+    }
+
+    /**
+     * Renders the seal/trim/lock/void overlays for an item icon (WAILA HUD), mirroring
+     * {@link #renderWorldBlock}'s alpha-pass overlay pass but in self-contained Tessellator
+     * batches suitable for the inventory/item render path (which has no chunk-renderer-managed
+     * open batch). {@code tile} is a transient {@link TileTank} reconstructed from the item's
+     * portable NBT (worldObj == null); only portable state is read, so this is null-world-safe.
+     *
+     * <p>
+     * Drawn in block-local {@code 0..1} space at the origin; the caller wraps this in a
+     * {@code -0.5} translate (same as {@link #renderInventoryBlock}). Brightness is forced
+     * full-bright (GUI HUD icon); blend is enabled so the transparent pixels of the
+     * lock/claim/void indicator icons blend correctly (matches the in-world alpha pass).
+     */
+    public void renderInventoryOverlays(BlockTank tank, TileTank tile, RenderBlocks renderer) {
+        Tessellator tess = Tessellator.instance;
+        boolean prevAO = renderer.enableAO;
+        renderer.enableAO = false;
+
+        boolean prevBlend = GL11.glGetBoolean(GL11.GL_BLEND);
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+
+        // Full-face overlays: seal/tape + storage trim (drawn slightly outside the block).
+        tess.startDrawingQuads();
+        tess.setBrightness(FULL_BRIGHT);
+        tess.setColorOpaque_F(1.0F, 1.0F, 1.0F);
+        if (tile.isSealed()) {
+            drawFullFaceOverlay(renderer, tank, tank.getIconTape(), 0, 0, 0);
+        }
+        int trimLevel = tile.getStorageTrimLevel();
+        if (trimLevel >= 2) {
+            IIcon trimIcon = tank.getIconTrim(trimLevel);
+            if (trimIcon != null) {
+                drawFullFaceOverlay(renderer, tank, trimIcon, 0, 0, 0);
+            }
+        }
+        tess.draw();
+
+        // Small indicator icons: lock/claim (top-center) + void (top-corner).
+        boolean locked = tile.getAttributes()
+            .isItemLocked(LockAttribute.LOCK_POPULATED)
+            || tile.getAttributes()
+                .isItemLocked(LockAttribute.LOCK_EMPTY);
+        boolean hasOwner = tile.getOwner() != null;
+        if (locked || hasOwner) {
+            IIcon icon;
+            if (locked && hasOwner) icon = tank.getIconClaimLock();
+            else if (locked) icon = tank.getIconLock();
+            else icon = tank.getIconClaim();
+            // Lock/claim: centered on each side (1.12.2 lock_part.json: x/z 7.25-8.75, y 14.25-15.75)
+            double c = 7.25 * U, d = 8.75 * U;
+            tess.startDrawingQuads();
+            tess.setBrightness(FULL_BRIGHT);
+            tess.setColorOpaque_F(1.0F, 1.0F, 1.0F);
+            drawIconQuads(tess, icon, 0, 0, 0, c, d, c, d, c, d, c, d, 14.25 * U, 15.75 * U);
+            tess.draw();
+        }
+        if (tile.getAttributes()
+            .isVoid()) {
+            // Void: corner of each side (1.12.2 void_part.json: N x=0.25-1.75, S x=14.25-15.75, etc.)
+            tess.startDrawingQuads();
+            tess.setBrightness(FULL_BRIGHT);
+            tess.setColorOpaque_F(1.0F, 1.0F, 1.0F);
+            drawIconQuads(
+                tess,
+                tank.getIconVoid(),
+                0,
+                0,
+                0,
+                0.25 * U,
+                1.75 * U, // N: left corner
+                14.25 * U,
+                15.75 * U, // S: right corner
+                14.25 * U,
+                15.75 * U, // W: back corner
+                0.25 * U,
+                1.75 * U, // E: front corner
+                14.25 * U,
+                15.75 * U);
+            tess.draw();
+        }
+
+        if (!prevBlend) GL11.glDisable(GL11.GL_BLEND);
+        renderer.enableAO = prevAO;
     }
 
     /**

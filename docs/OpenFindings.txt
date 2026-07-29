@@ -7,3 +7,5 @@ Phase 10:
 
 Miscellaneous:
     - Controller should be able to take fluid container as item instead of fluid if storage drawer storing it is closer than fluid tank
+    - GL leaks
+    - Tanks overlays don't show in WAILA

@@ -1,5 +1,6 @@
 package com.mrfuzzihead.fluiddrawers.client.tesr;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.texture.TextureMap;
@@ -38,6 +39,12 @@ import cpw.mods.fml.relauncher.SideOnly;
  * env), so brightness tracks torchlight changes without double-darkening the tint.
  *
  * <p>
+ * The fluid-draw core is factored into {@link #renderFluid} so the WAILA HUD item renderer
+ * ({@link com.mrfuzzihead.fluiddrawers.client.renderer.ItemRendererTank}) can reuse the exact
+ * geometry/tinting for the tank's item icon via {@link #renderFluidForItem}, using full-bright
+ * lighting and a transient (world-less) {@link TileTank} reconstructed from portable NBT.
+ *
+ * <p>
  * Deferred to Phase 14: the {@code isShowingQuantity()} floating label + its sync packets.
  */
 @SideOnly(Side.CLIENT)
@@ -50,10 +57,67 @@ public class RenderTileTank extends TileEntitySpecialRenderer {
     // Fluid occupies up to 0.75 of the block height (12/16), leaving room for the top slab.
     private static final double HEIGHT_SCALE = 0.75;
 
+    // Packed full-bright brightness (skyLight=15, blockLight=15): (15 << 20) | (15 << 4). Used
+    // for the item-icon path where there is no world to sample brightness from. Matches the value
+    // Minecraft treats as "full bright" (also = the (240, 240) lightmap coord).
+    private static final int FULL_BRIGHT = 0x00F000F0;
+
     @Override
     public void renderTileEntityAt(TileEntity te, double x, double y, double z, float partialTicks) {
         TileTank tile = (TileTank) te;
         if (tile.getWorldObj() == null) return;
+
+        // Luminosity comes from the stored fluid (lava glows, etc.); 0 when the tank is empty.
+        FluidDrawer drawer = tile.getDrawerGroup()
+            .getFluidDrawer();
+        FluidStack fluid = drawer.getStoredFluid();
+        int luminosity = fluid != null ? fluid.getFluid()
+            .getLuminosity(fluid) : 0;
+
+        // Packed sky/block brightness at the tank, raised by the fluid's luminosity (the 1.7.10
+        // equivalent of the 1.12.2 func_178459_a().func_175626_b(pos, luminosity)). Packed as
+        // (skyLight << 20) | (blockLight << 4), so ambLight % 65536 == blockLight<<4 and
+        // ambLight / 65536 == skyLight<<4.
+        int ambLight = tile.getWorldObj()
+            .getLightBrightnessForSkyBlocks(tile.xCoord, tile.yCoord, tile.zCoord, luminosity);
+
+        // Fluid still icons live on the block atlas (Fluid.getSpriteNumber() == 0).
+        bindTexture(TextureMap.locationBlocksTexture);
+
+        renderFluid(tile, ambLight, x, y, z);
+
+        // TODO Phase 14: if (tile.getAttributes().isShowingQuantity()) render the floating
+        // "fluid name / X mB" label on all four sides (FontRenderer + the
+        // SPacketSyncFluidDrawerCount/Fluid custom sync packets). Deferred -- not part of Phase 7.
+    }
+
+    /**
+     * Draws the tank's stored fluid for an item icon (WAILA HUD). Uses full-bright lighting (no
+     * world) and draws in block-local {@code 0..1} space; the caller wraps the call in a
+     * {@code -0.5} translate so the model is centered, matching
+     * {@link com.mrfuzzihead.fluiddrawers.client.renderer.BlockTankRenderer#renderInventoryBlock}.
+     *
+     * <p>
+     * {@code tile} is a transient {@link TileTank} reconstructed from the item's portable NBT
+     * (worldObj == null); this method touches only portable state, so it is null-world-safe.
+     */
+    public static void renderFluidForItem(TileTank tile) {
+        // The TESR's instance bindTexture() is unavailable in a static context; bind the block
+        // atlas directly via the shared texture manager (same texture the still icons live on).
+        Minecraft.getMinecraft()
+            .getTextureManager()
+            .bindTexture(TextureMap.locationBlocksTexture);
+        renderFluid(tile, FULL_BRIGHT, 0.0D, 0.0D, 0.0D);
+    }
+
+    /**
+     * Core fluid draw: computes fill/alpha/tint from the tank's portable state, sets up the GL
+     * state (lighting off, optional translucent blend, lightmap), translates to the centered
+     * fluid box at {@code (x, y, z) + (0.5, Y_OFFSET, 0.5)}, draws the four side faces + the top
+     * surface, and restores GL state. Caller is responsible for binding the block atlas before
+     * calling. {@code ambLight} is the packed brightness to bake per-vertex.
+     */
+    private static void renderFluid(TileTank tile, int ambLight, double x, double y, double z) {
         // A concealed tank hides its contents (1.12.2 isConcealed() guard).
         if (tile.getAttributes()
             .isConcealed()) return;
@@ -101,21 +165,6 @@ public class RenderTileTank extends TileEntitySpecialRenderer {
                     alpha = clamp01((float) fluid.amount / (float) capacity);
                     if (alpha < 0.01F) alpha = 0.01F;
                 }
-
-        // Packed sky/block brightness at the tank, raised by the fluid's luminosity (the 1.7.10
-        // equivalent of the 1.12.2 func_178459_a().func_175626_b(pos, luminosity)). Packed as
-        // (skyLight << 20) | (blockLight << 4), so ambLight % 65536 == blockLight<<4 and
-        // ambLight / 65536 == skyLight<<4.
-        int ambLight = tile.getWorldObj()
-            .getLightBrightnessForSkyBlocks(
-                tile.xCoord,
-                tile.yCoord,
-                tile.zCoord,
-                fluid.getFluid()
-                    .getLuminosity(fluid));
-
-        // Fluid still icons live on the block atlas (Fluid.getSpriteNumber() == 0).
-        bindTexture(TextureMap.locationBlocksTexture);
 
         // --- GL state: minimal and symmetric. Blend is enabled ONLY for translucent fluids
         // (gaseous / lighter-than-air, alpha < 1.0). The common opaque case (water, lava) leaves
@@ -170,10 +219,6 @@ public class RenderTileTank extends TileEntitySpecialRenderer {
         if (prevLighting) GL11.glEnable(GL11.GL_LIGHTING);
         if (useBlend) GL11.glDisable(GL11.GL_BLEND);
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-
-        // TODO Phase 14: if (tile.getAttributes().isShowingQuantity()) render the floating
-        // "fluid name / X mB" label on all four sides (FontRenderer + the
-        // SPacketSyncFluidDrawerCount/Fluid custom sync packets). Deferred -- not part of Phase 7.
     }
 
     /**
