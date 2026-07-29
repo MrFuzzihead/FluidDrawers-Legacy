@@ -91,7 +91,7 @@ public class ItemRendererTank implements IItemRenderer {
             // Draw the base frame + glass. Use the vending texture when the tank has a Creative
             // Vending upgrade, mirroring BlockTankRenderer.renderWorldBlock's in-world check.
             IIcon frameIcon = tile.isVending() ? block.getIconTankVending() : block.getIconTank();
-            ISBRH.renderInventoryFrame(block, frameIcon, renderer);
+            ISBRH.renderInventoryFrame(block, frameIcon, renderer, true);
 
             // Fluid + overlays are drawn in block-local 0..1 space; wrap in a -0.5 translate to
             // center the model (matching renderInventoryBlock's own centering).
@@ -102,17 +102,20 @@ public class ItemRendererTank implements IItemRenderer {
 
             OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, prevLX, prevLY);
         } else {
-            // Inventory (GUI + hotbar) icons must be full-bright regardless of the lightmap current
-            // coord. The first-person held-item path (ItemRenderer.renderItemInFirstPerson) sets the
-            // lightmap to the player's AMBIENT world light, and that state leaks past the hand render
-            // into the HUD hotbar (rendered after the hand), darkening the tank icon whenever ANY
-            // item is held -- an empty hand leaves the lightmap at GUI full-bright, which is why the
-            // tank only looks dark while holding something. Forcing full-bright here for the
-            // INVENTORY type only (save/restore) decouples the icon from that leak. The held-in-hand
-            // (EQUIPPED*) and dropped (ENTITY) types intentionally inherit the ambient lightmap
-            // (dark at night), matching the established design and the OpenBlocks pattern, and
-            // avoiding the "glows near-white in complete darkness" regression from the prior
-            // unconditional setBrightness(15728880) hardcode.
+            // Inventory (GUI + hotbar) icons must be full-bright. The first-person held-item path
+            // (ItemRenderer.renderItemInFirstPerson) BOTH calls enableStandardItemLighting
+            // (ItemRenderer:272, world-aligned GL lights) AND sets the lightmap to the player's
+            // AMBIENT world light (ItemRenderer:287-290); both leak past the hand render into the HUD
+            // hotbar pass, darkening the icon whenever ANY item is held -- an empty hand leaves the
+            // GUI full-bright state, which is why the tank only looks dark while holding something.
+            // renderInventoryFrame(fullBright=true) fixes the frame+glass: it disables GL_LIGHTING
+            // (bypassing the leaked OpenGL-light darkening) and bakes FULL_BRIGHT per-vertex
+            // (bypassing the leaked-lightmap darkening). The lightmap save/restore below additionally
+            // shields the tape overlay (drawn in a separate Tessellator batch with no setBrightness)
+            // so it also renders full-bright via the (240, 240) current coord. The EQUIPPED*/ENTITY
+            // types pass fullBright=false so the held/dropped item inherits the ambient lightmap
+            // (dark at night), preserving the Finding-3 design and avoiding the "glows near-white in
+            // darkness" regression from the prior unconditional setBrightness hardcode.
             boolean inventoryFullBright = (type == IItemRenderer.ItemRenderType.INVENTORY);
             float prevLX = 0.0F, prevLY = 0.0F;
             if (inventoryFullBright) {
@@ -121,8 +124,9 @@ public class ItemRendererTank implements IItemRenderer {
                 OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, 240.0F, 240.0F);
             }
 
-            // Draw the base frame + glass (same as the ISBRH's renderInventoryBlock).
-            ISBRH.renderInventoryBlock(block, 0, ModBlocks.tankRenderId, renderer);
+            // Draw the base frame + glass. Pass fullBright so the inventory/hotbar icon is forced
+            // full-bright (GL_LIGHTING off + baked FULL_BRIGHT); held/dropped inherit ambient.
+            ISBRH.renderInventoryFrame(block, block.getIconTank(), renderer, inventoryFullBright);
 
             // If the item is sealed (has "Tile" portable NBT), draw the tape overlay on top.
             // renderInventoryBlock opened + closed its own Tessellator batch (startDrawingQuads/draw),

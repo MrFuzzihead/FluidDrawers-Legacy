@@ -47,7 +47,7 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
         if (!(block instanceof BlockTank)) return;
         // Default item icon: normal tank texture. The WAILA HUD path calls renderInventoryFrame
         // directly with the vending texture when the live tank has a Creative Vending upgrade.
-        renderInventoryFrame((BlockTank) block, ((BlockTank) block).getIconTank(), renderer);
+        renderInventoryFrame((BlockTank) block, ((BlockTank) block).getIconTank(), renderer, true);
     }
 
     /**
@@ -56,7 +56,7 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
      * {@link BlockTank#getIconTankVending()} when the live tank has a Creative Vending upgrade,
      * mirroring {@link #renderWorldBlock}'s vending check on the in-world metal frame.
      */
-    public void renderInventoryFrame(BlockTank tank, IIcon frameIcon, RenderBlocks renderer) {
+    public void renderInventoryFrame(BlockTank tank, IIcon frameIcon, RenderBlocks renderer, boolean fullBright) {
         IIcon iconGlass = tank.getIconGlass();
 
         // The framework dispatches us via ForgeHooksClient.renderInventoryItem, which binds the
@@ -68,40 +68,53 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
         // RenderItem.java: for getRenderBlockPass()!=0 it does glEnable(GL_ALPHA_TEST),
         // glAlphaFunc(GL_GREATER, 0.1F), glEnable(GL_BLEND), OpenGlHelper.glBlendFunc(770, 771, 1, 0)).
         //
-        // Brightness is NOT forced here. The quads inherit the lightmap current coord set by each
-        // caller: inventory slot uses GuiContainer's full-bright (240, 240); held-in-hand uses the
-        // player's ambient world light (dark at night); dropped entity uses ambient. ItemRendererTank
-        // additionally forces full-bright for the INVENTORY type only, to shield the hotbar icon from
-        // the ambient lightmap that the first-person hand leaves leaked into the HUD pass. Forcing
-        // setBrightness(15728880) here unconditionally previously made the held/dropped item glow
-        // near-white in complete darkness. Per-face directional shading (setColorOpaque_F in drawBox)
-        // is still applied for the 3D look. Matches the OpenBlocks pattern (no forced item brightness
-        // in the shared render path).
+        // Lighting (the "darker while holding any item" bug): the first-person held-item path
+        // (ItemRenderer.renderItemInFirstPerson) does BOTH enableStandardItemLighting
+        // (ItemRenderer:272, world-aligned GL lights) AND sets the lightmap to the player's AMBIENT
+        // world light (ItemRenderer:287-290). Both leak past the hand render into the HUD hotbar
+        // pass, darkening the icon whenever ANY item is held (an empty hand leaves the GUI full-bright
+        // state, hence the symptom only appears while holding something). For fullBright=true
+        // (inventory/hotbar/WAILA icon) we disable fixed-function GL_LIGHTING (removes the leaked
+        // OpenGL-light darkening) and bake FULL_BRIGHT per-vertex via setBrightness (removes the
+        // leaked-lightmap darkening). renderFace* (enableAO=false) does NOT call setBrightness itself
+        // (verified vs decompiled RenderBlocks.renderFaceYNeg: the non-AO branch only does
+        // addVertexWithUV), so the vertices inherit the Tessellator's current brightness -- baking
+        // FULL_BRIGHT guarantees they sample the lightmap at (15,15) regardless of the current coord.
+        // The EQUIPPED*/ENTITY types pass fullBright=false so the held/dropped item inherits the
+        // ambient lightmap (dark at night), preserving the Finding-3 design and avoiding the
+        // "glows near-white in darkness" regression from the prior unconditional setBrightness hardcode.
+        // Per-face setColorOpaque_F directional shading still applies for the 3D look. Matches the
+        // OpenBlocks TESR pattern (disable lighting, bake brightness).
         Tessellator tess = Tessellator.instance;
         boolean prevAO = renderer.enableAO;
         renderer.enableAO = false;
 
-        // Scope {blend, blendFunc, alphaTest, alphaFunc, depthMask, colorWrite} so the caller's
-        // state is restored exactly -- no GL-state leak into later fullscreen passes (a rare
-        // white-bar flash was observed when this state churned unsymmetrically). The held-in-hand
-        // codepath (ItemRenderer.renderItem) sets glDepthMask(false) for any block whose
-        // getRenderBlockPass()!=0; with depth-write off our opaque metal frame loses occlusion and
-        // the corner posts (drawn after the top slab) bleed through the top face. We force
+        // Scope {blend, blendFunc, alphaTest, alphaFunc, depthMask, colorWrite, lighting, lights}
+        // so the caller's state is restored exactly -- no GL-state leak into later fullscreen passes
+        // (a rare white-bar flash was observed when this state churned unsymmetrically). The
+        // held-in-hand codepath (ItemRenderer.renderItem) sets glDepthMask(false) for any block
+        // whose getRenderBlockPass()!=0; with depth-write off our opaque metal frame loses occlusion
+        // and the corner posts (drawn after the top slab) bleed through the top face. We force
         // depth-write on here. The inventory-slot path leaves these already-on, so this is a no-op
         // there. Matches the SD TileEntityDrawersRenderer glPushAttrib pattern.
-        GL11.glPushAttrib(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
+        GL11.glPushAttrib(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT | GL11.GL_LIGHTING_BIT);
         GL11.glEnable(GL11.GL_ALPHA_TEST);
         GL11.glAlphaFunc(GL11.GL_GREATER, 0.1F);
         GL11.glEnable(GL11.GL_BLEND);
         OpenGlHelper.glBlendFunc(770, 771, 1, 0); // GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA (mirrors renderItemIntoGUI)
         GL11.glDepthMask(true);
+        if (fullBright) {
+            GL11.glDisable(GL11.GL_LIGHTING);
+        }
 
         GL11.glTranslatef(-0.5F, -0.5F, -0.5F);
 
         tess.startDrawingQuads();
-        // No setBrightness: use the ambient/GUI lightmap (see comment above). renderFace* with
-        // enableAO=false emits vertices carrying the per-face setColorOpaque_F directional shade
-        // and the caller's lightmap current coord.
+        if (fullBright) {
+            // Bake full-bright (skyLight=15, blockLight=15) per-vertex so the quads sample the
+            // lightmap at (15,15) regardless of the (possibly leaked-ambient) current coord.
+            tess.setBrightness(FULL_BRIGHT);
+        }
         renderMetalFrame(tank, frameIcon, renderer, 0.0, 0.0, 0.0);
         renderGlass(tank, iconGlass, renderer, 0.0, 0.0, 0.0);
         tess.draw();
@@ -113,6 +126,14 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
         GL11.glPopAttrib();
         renderer.setRenderBounds(0.0, 0.0, 0.0, 1.0, 1.0, 1.0);
         renderer.enableAO = prevAO;
+    }
+
+    /**
+     * Convenience overload: default (non-forced-bright) inventory render, used by the ISBRH
+     * fallback. Equivalent to {@code renderInventoryFrame(tank, frameIcon, renderer, false)}.
+     */
+    public void renderInventoryFrame(BlockTank tank, IIcon frameIcon, RenderBlocks renderer) {
+        renderInventoryFrame(tank, frameIcon, renderer, false);
     }
 
     @Override
