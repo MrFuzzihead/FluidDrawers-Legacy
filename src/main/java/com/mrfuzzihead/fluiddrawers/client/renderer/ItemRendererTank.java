@@ -46,6 +46,11 @@ public class ItemRendererTank implements IItemRenderer {
 
     private static final double U = 1.0 / 16.0;
 
+    // Packed full-bright brightness (skyLight=15, blockLight=15): (15 << 20) | (15 << 4). Used to
+    // bake full-bright per-vertex for the inventory tape overlay (mirrors BlockTankRenderer /
+    // RenderTileTank's FULL_BRIGHT).
+    private static final int FULL_BRIGHT = 0x00F000F0;
+
     @Override
     public boolean handleRenderType(ItemStack item, IItemRenderer.ItemRenderType type) {
         return true;
@@ -108,35 +113,42 @@ public class ItemRendererTank implements IItemRenderer {
             // AMBIENT world light (ItemRenderer:287-290); both leak past the hand render into the HUD
             // hotbar pass, darkening the icon whenever ANY item is held -- an empty hand leaves the
             // GUI full-bright state, which is why the tank only looks dark while holding something.
-            // renderInventoryFrame(fullBright=true) fixes the frame+glass: it disables GL_LIGHTING
-            // (bypassing the leaked OpenGL-light darkening) and bakes FULL_BRIGHT per-vertex
-            // (bypassing the leaked-lightmap darkening). The lightmap save/restore below additionally
-            // shields the tape overlay (drawn in a separate Tessellator batch with no setBrightness)
-            // so it also renders full-bright via the (240, 240) current coord. The EQUIPPED*/ENTITY
-            // types pass fullBright=false so the held/dropped item inherits the ambient lightmap
-            // (dark at night), preserving the Finding-3 design and avoiding the "glows near-white in
-            // darkness" regression from the prior unconditional setBrightness hardcode.
+            // renderInventoryFrame(fullBright=true) fixes the frame+glass (disables GL_LIGHTING +
+            // bakes FULL_BRIGHT per-vertex), and the tape overlay below applies the same treatment.
+            // The EQUIPPED*/ENTITY types pass fullBright=false so the held/dropped item inherits the
+            // ambient lightmap (dark at night), preserving the Finding-3 design and avoiding the
+            // "glows near-white in darkness" regression from the prior unconditional setBrightness.
             boolean inventoryFullBright = (type == IItemRenderer.ItemRenderType.INVENTORY);
-            float prevLX = 0.0F, prevLY = 0.0F;
-            if (inventoryFullBright) {
-                prevLX = OpenGlHelper.lastBrightnessX;
-                prevLY = OpenGlHelper.lastBrightnessY;
-                OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, 240.0F, 240.0F);
-            }
 
             // Draw the base frame + glass. Pass fullBright so the inventory/hotbar icon is forced
             // full-bright (GL_LIGHTING off + baked FULL_BRIGHT); held/dropped inherit ambient.
             ISBRH.renderInventoryFrame(block, block.getIconTank(), renderer, inventoryFullBright);
 
-            // If the item is sealed (has "Tile" portable NBT), draw the tape overlay on top.
-            // renderInventoryBlock opened + closed its own Tessellator batch (startDrawingQuads/draw),
-            // so we need a fresh batch for the overlay quads.
+            // If the item is sealed (has "Tile" portable NBT), draw the tape overlay on top. The
+            // tape is a separate Tessellator batch (renderInventoryFrame already closed its own), so
+            // it must re-establish the same GL state: blend + alphaFunc for the tape icon's
+            // transparent pixels, and (for the inventory icon) GL_LIGHTING off + baked FULL_BRIGHT so
+            // the tape is full-bright and not darkened by the leaked first-person-hand light.
+            // Without this the sealed tank re-introduced both the opaque-glass and the
+            // darker-while-holding symptoms: the tape's transparent pixels rendered opaque (no blend)
+            // and the leaked light darkened them, masking the fixed frame+glass behind.
             if (hasTile) {
                 IIcon tapeIcon = block.getIconTape();
                 if (tapeIcon != null) {
                     GL11.glTranslatef(-0.5F, -0.5F, -0.5F);
+                    GL11.glPushAttrib(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT | GL11.GL_LIGHTING_BIT);
+                    GL11.glEnable(GL11.GL_ALPHA_TEST);
+                    GL11.glAlphaFunc(GL11.GL_GREATER, 0.1F);
+                    GL11.glEnable(GL11.GL_BLEND);
+                    OpenGlHelper.glBlendFunc(770, 771, 1, 0);
+                    if (inventoryFullBright) {
+                        GL11.glDisable(GL11.GL_LIGHTING);
+                    }
                     Tessellator tess = Tessellator.instance;
                     tess.startDrawingQuads();
+                    if (inventoryFullBright) {
+                        tess.setBrightness(FULL_BRIGHT);
+                    }
                     tess.setColorOpaque_F(1.0F, 1.0F, 1.0F);
                     double off = 0.003;
                     renderer.setRenderBounds(0, 0, -off, 1, 1, 1);
@@ -148,12 +160,10 @@ public class ItemRendererTank implements IItemRenderer {
                     renderer.setRenderBounds(0, 0, 0, 1 + off, 1, 1);
                     renderer.renderFaceXPos(block, 0, 0, 0, tapeIcon);
                     tess.draw();
+                    GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+                    GL11.glPopAttrib();
                     GL11.glTranslatef(0.5F, 0.5F, 0.5F);
                 }
-            }
-
-            if (inventoryFullBright) {
-                OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, prevLX, prevLY);
             }
         }
     }
