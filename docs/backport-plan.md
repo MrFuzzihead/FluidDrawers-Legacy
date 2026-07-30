@@ -65,7 +65,7 @@ The 1.12.2 source is layered on three things that **do not exist in 1.7.10** and
 
 ### Phase 2 -- Hollow-frame in-world block renderer (the real 1.12.2 look)
 - **Goal:** Replace the solid cube with the 1.12.2 frame geometry -- metal frame (`tank.png`) + glass pane interior -- via a 1.7.10 `ISimpleBlockRenderingHandler` registered with `RenderingRegistry`. Item icon stays `tank.png`.
-- **Touches:** new `client/renderer/BlockTankRenderer` (`ISimpleBlockRenderingHandler`, draws the 7 elements from `models/block/tank.json`: bottom/top slabs, 4 corner posts, inner glass cube) using `IIcon`s (`tank.png` + vanilla glass); `BlockTank.getRenderType` returns the custom render ID; **`isOpaqueCube()`=false and `renderAsNormalBlock()`=false** (port the 1.12.2 `func_149662_c`/`func_149686_d` overrides -- otherwise the hollow frame is treated as a full solid cube for lighting/AO/culling and you get a black box behind the glass); **implement `renderInventoryBlock` explicitly** (a custom render type removes the automatic flat-icon fallback, so the item would render blank in the hotbar/hand even though `tank.png` is correct in-world); `getRenderBlockPass`/`canRenderInPass`; `ClientProxy` register handler + `registerIcons`. Delete the now-unneeded 1.12.2 `assets/.../blockstates` & `models` JSON from `src/main/resources` if copied (they're ignored in 1.7.10).
+- **Touches:** new `client/renderer/BlockTankRenderer` (`ISimpleBlockRenderingHandler`, draws the 7 elements from `models/block/tank.json`: bottom/top slabs, 4 corner posts, inner glass cube) using `IIcon`s (`tank.png` + vanilla glass); `BlockTank.getRenderType` returns the custom render ID; **`isOpaqueCube()`=false and `renderAsNormalBlock()`=false** (port the 1.12.2 `func_149662_c`/`func_149686_d` overrides -- otherwise the hollow frame is treated as a full solid cube for lighting/AO/culling, and you get a black box behind the glass); **implement `renderInventoryBlock` explicitly** (a custom render type removes the automatic flat-icon fallback, so the item would render blank in the hotbar/hand even though `tank.png` is correct in-world); `getRenderBlockPass`/`canRenderInPass`; `ClientProxy` register handler + `registerIcons`. Delete the now-unneeded 1.12.2 `assets/.../blockstates` & `models` JSON from `src/main/resources` if copied (they're ignored in 1.7.10).
 - **In-game test:** Placed tank shows the hollow glass frame -- see through the glass to the back, **no black/opaque box, correct ambient light**; item icon shows `tank.png` **in the hotbar, inventory, and held in hand** (not blank).
 - **Depends on:** 1. *(Block + texture now complete -- functionality begins.)*
 
@@ -110,17 +110,18 @@ The 1.12.2 source is layered on three things that **do not exist in 1.7.10** and
 - **In-game test:** Open GUI → insert a storage upgrade → capacity increases (fill more buckets confirm); insert downgrade → capacity drops to 1000; can't remove a storage upgrade if current fluid exceeds the lower capacity. Build + launch + no crash.
 - **Depends on:** 8, 4.
 
-### Phase 10 -- Behavioral upgrades (void, redstone, lock, vending/creative)
-- **Goal:** Void, redstone-signal, lock, and creative-vending upgrades take effect.
-- **Touches:** void (`IVoidable`/`isVoid` → excess voided); lock (`ModItems.upgradeLock` → `LockAttribute.LOCK_EMPTY/LOCK_POPULATED` via `SimpleDrawerAttributes`, honored in `SimpleFluidDrawer.canFluidBeStored`); **redstone -- direct output, not a comparator override** (verified from 1.12.2 `BlockTankBase`/`TileTank`): `canProvidePower()=true`; `isProvidingWeakPower` returns `tile.getRedstoneLevel()` on **all sides** when `hasLevelEmitter()` (redstone upgrade present + `enableRedstoneUpgrades`); `isProvidingStrongPower` returns that level only on `UP`, else 0; `getRedstoneLevel()` = `clamp(1 + floor(14 * amount / maxCapacity), 1, 15)` (0 when empty); `markDirty` → `notifyNeighbors()` (notify block + block below) when a level emitter is present so fluid changes update the signal; vending (`ModItems.upgradeCreative` → `isUnlimitedVending` → infinite fluid + `tank_vending.png` texture swap in the **static block renderer** -- **must call `worldObj.markBlockForUpdate(x,y,z)` on install/remove so the chunk re-renders**, since the frame geometry is baked into the static mesh and won't refresh from a TE data change alone, unlike the Phase 7 TESR).
-- **In-game test:** Void upgrade → overfill is discarded; lock upgrade → draining to 0 keeps the fluid "locked" (slot remembers fluid); **redstone upgrade → a redstone lamp OR dust adjacent on a horizontal side reads 1-15 proportional to fill (0 when empty) -- this is direct weak power on all sides, NOT a comparator reading** (also note the historically-faithful quirk: it will energize adjacent hoppers/dust on every side, not just comparators); creative upgrade → infinite output + tank shows vending texture **immediately on install (no chunk reload needed)**. Build + launch + no crash.
+### Phase 10 -- Behavioral upgrades (void, redstone, vending/creative)
+- **Goal:** Void, redstone-signal, and creative-vending upgrades take effect. *(Lock removed from Phase 10 — see finding in OpenFindings.txt; lock is an interaction item, not an upgrade-slot item, handled in Phase 11.)*
+- **Touches:** void (`IVoidable`/`isVoid` → excess voided); **redstone -- direct output, not a comparator override** (verified from 1.12.2 `BlockTankBase`/`TileTank`): `canProvidePower()=true`; `isProvidingWeakPower` returns `tile.getRedstoneLevel()` on **all sides** when `hasLevelEmitter()` (redstone upgrade present + `enableRedstoneUpgrades`); `isProvidingStrongPower` returns that level only on `UP`, else 0; `getRedstoneLevel()` = `clamp(1 + floor(14 * amount / maxCapacity), 1, 15)` (0 when empty); `markDirty` → `notifyNeighbors()` (notify block + block below) when a level emitter is present so fluid changes update the signal; vending (`ModItems.upgradeCreative` → `isUnlimitedVending` → infinite fluid + `tank_vending.png` texture swap in the **static block renderer** -- **must call `worldObj.markBlockForUpdate(x,y,z)` on install/remove so the chunk re-renders**, since the frame geometry is baked into the static mesh and won't refresh from a TE data change alone, unlike the Phase 7 TESR).
+- **In-game test:** Void upgrade → overfill is discarded; **redstone upgrade → a redstone lamp OR dust adjacent on a horizontal side reads 1-15 proportional to fill (0 when empty) -- this is direct weak power on all sides, NOT a comparator reading** (also note the historically-faithful quirk: it will energize adjacent hoppers/dust on every side, not just comparators); creative upgrade → infinite output + tank shows vending texture **immediately on install (no chunk reload needed)**. Build + launch + no crash.
 - **Depends on:** 9.
 
-### Phase 11 -- Seal & security (tape + personal key) + attribute overlays
-- **Goal:** Tape seals the tank; personal key sets ownership; overlays render (tape/seal/lock).
-- **Touches:** `ISealable` (tape → `sealed`; **sealing is applied by `ItemTape.onItemUse`**, not in `onBlockActivated` -- the block returns false for `ModItems.tape` to let the item run; **unsealing** is the empty-hand+sneak branch in `onBlockActivated`), `IProtectable`/`SecurityManager` (`ModItems.personalKey` → owner; the **security-first guard** in the dispatcher (section 4) blocks non-owners from every interaction), NBT for `sealed`/`owner`/`securityKey` (all config-gated by `enableTape`/`enablePersonalUpgrades` like 1.12.2); wire the `!isSealed()` gate on the Phase 5 fluid-transfer branch and the `ItemPersonalKey` ownership-toggle branch into the dispatcher; render the seal/lock/void overlays (1.12.2 `seal_part`/`lock_part`/`void_part` submodels → extra quads in the block renderer or TESR) with a `markBlockForUpdate` so they appear without a chunk reload; `keepContentsOnBreak` interaction with sealed. Add seal/ownership message lang keys.
-- **In-game test:** Apply tape → sealed (can't fill/drain), tape overlay visible **immediately**; sneak+empty-hand → unseals; apply personal key → owner set, a second player can't interact (can't fill/drain/open GUI -- security-first guard); break a sealed tank → re-place → contents preserved.
+### Phase 11 -- Seal, security, & lock (tape + personal key + lock key) + attribute overlays
+- **Goal:** Tape seals the tank; personal key sets ownership; lock key toggles lock; overlays render (tape/seal/lock).
+- **Touches:** lock (`ModItems.upgradeLock` → toggle `LockAttribute.LOCK_EMPTY/LOCK_POPULATED` via interaction in `onBlockActivated`, NOT via upgrade slots — this is a physical key you right-click with); `ISealable` (tape → `sealed`; **sealing is applied by `ItemTape.onItemUse`**, not in `onBlockActivated` -- the block returns false for `ModItems.tape` to let the item run; **unsealing** is the empty-hand+sneak branch in `onBlockActivated`), `IProtectable`/`SecurityManager` (`ModItems.personalKey` → owner; the **security-first guard** in the dispatcher (section 4) blocks non-owners from every interaction), NBT for `sealed`/`owner`/`securityKey` (all config-gated by `enableTape`/`enablePersonalUpgrades` like 1.12.2); wire the `!isSealed()` gate on the Phase 5 fluid-transfer branch and the `ItemPersonalKey` ownership-toggle branch into the dispatcher; render the seal/lock/void overlays (1.12.2 `seal_part`/`lock_part`/`void_part` submodels → extra quads in the block renderer or TESR) with a `markBlockForUpdate` so they appear without a chunk reload; `keepContentsOnBreak` interaction with sealed. Add seal/ownership/lock message lang keys.
+- **In-game test:** Apply tape → sealed (can't fill/drain), tape overlay visible **immediately**; sneak+empty-hand → unseals; apply personal key → owner set, a second player can't interact (can't fill/drain/open GUI -- security-first guard); right-click with lock key → lock toggled, lock overlay visible; break a sealed tank → re-place → contents preserved.
 - **Depends on:** 5, 7, 8, 10.
+
 ### Phase 12 -- Item-block NBT persistence + custom name
 - **Goal:** Breaking a tank keeps its fluid/upgrades in the dropped item; placing restores them.
 - **Touches:** `item/block/ItemBlockTank` (read "Tile" NBT on place → restore TE; `FramedItem`-style material handling skipped -- deferred); `BlockTank.getDrops`/`getDroppedDrawerItem` (write TE NBT into item when sealed or `keepContentsOnBreak`); custom name (`IWorldNameable`/`CustomNameData`-equivalent inline) + name display.
@@ -139,11 +140,18 @@ The 1.12.2 source is layered on three things that **do not exist in 1.7.10** and
 - **In-game test:** Apply quantify key → floating "Water / 1,000 mB" appears on the tank sides; updates on fill/drain.
 - **Depends on:** 7, 10.
 
-### Phase 15 -- Config GUI *(optional, low priority)*
-- **Goal:** In-mod config screen for the three config values.
-- **Touches:** `client/handler/ConfigGuiHandler` → Forge 1.7.10 `GuiConfig`/`GuiFactory`.
-- **In-game test:** Mods list → Fluid Drawers → Config → edit `baseCapacity` etc.; takes effect.
-- **Depends on:** 4.
+### Phase 15 -- Concealment key (concealment key) *(optional polish)*
+- **Goal:** Concealment key toggles hiding the fluid.
+- **Touches:** I don't know
+- **In-game test:** Apply concealment key → fluid not visible when toggled on, visible when toggled off.
+- **Depends on:** 7, 10.
+
+### STRETCH GOALS
+- **Framed Tank**
+- ~~Controller integration~~
+- ~~FCD compat NOT NEEDED~~
+- ~~Waila integration~~
+- ~~Test piping integration~~
 
 ## 5. Risks / "verify, don't guess" list (flagged for compile-driven discovery)
 - **Material/SoundType mapping** for `BlockTank` (1.12.2 `Material.field_151573_f`, `SoundType.field_185852_e`) → confirm via decompiled 1.12.2 (default `Material.glass` + glass sound).

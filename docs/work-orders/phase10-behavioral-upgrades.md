@@ -1,0 +1,26 @@
+﻿# Phase 10 -- Behavioral Upgrades (Void, Redstone, Creative/Vending)
+
+## Status: **COMPLETED** (build verified, in-game tested)
+
+## Source File(s)
+- `src/main/java/com/mrfuzzihead/fluiddrawers/tile/TileTank.java` (modified)
+- `src/main/java/com/mrfuzzihead/fluiddrawers/block/BlockTank.java` (modified)
+- `src/main/java/com/mrfuzzihead/fluiddrawers/client/renderer/BlockTankRenderer.java` (modified)
+- `src/main/java/com/mrfuzzihead/fluiddrawers/drawers/DrawerUpgradable.java` (modified)
+- `src/main/resources/assets/fluiddrawers/textures/blocks/tank_vending.png` (pre-existing)
+
+## Key Finding
+`ModItems.upgradeLock` (Drawer Key) is NOT an upgrade-slot item in SD 1.7.10 — it's a physical key you right-click with. Lock handling deferred to Phase 11 interaction dispatch. See docs/OpenFindings.txt.
+
+## Acceptance Criteria
+1. **Void upgrade**: Installing void causes overfill to be discarded. PASS
+2. **Redstone upgrade**: Installing redstone causes lamp/dust to read 1-15 proportional to fill. Direct weak power on all sides. PASS
+3. **Creative vending upgrade**: Installing vending causes infinite output + vending texture immediately. PASS
+4. **Lock is NOT accepted in upgrade slots**: ItemUpgradeLock is rejected by `isItemValidForSlot`. PASS
+
+## Implementation Notes
+- `TankUpgradeData.applyUpgradeEffects()` scans all upgrade slots and sets `isVoid`, `isUnlimitedVending`, and `redstoneEmitter` accordingly
+- `BlockTank` adds `canProvidePower()`, `isProvidingWeakPower()`, `isProvidingStrongPower()` for redstone
+- `BlockTankRenderer.renderWorldBlock()` checks TE's `isVending()` and uses `tank_vending.png` for the metal frame
+- `applyUpgradeEffects()` calls `worldObj.markBlockForUpdate()` to trigger immediate re-render on upgrade changes
+- Lock removed from `DrawerUpgradable.isUpgradeItem()` and `applyUpgradeEffects()` — it's a Phase 11 interaction item
