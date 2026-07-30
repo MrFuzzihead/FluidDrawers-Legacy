@@ -30,8 +30,7 @@ public class CommonProxy {
         ModRecipes.init();
 
         // Register WAILA integration if WAILA is loaded (compileOnly + runtimeOnly dep).
-        if (Loader.isModLoaded(WAILA))
-        {
+        if (Loader.isModLoaded(WAILA)) {
             FMLInterModComms.sendMessage(
                 WAILA,
                 "register",
