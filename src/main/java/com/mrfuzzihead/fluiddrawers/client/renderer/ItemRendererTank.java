@@ -2,7 +2,6 @@ package com.mrfuzzihead.fluiddrawers.client.renderer;
 
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.RenderBlocks;
-import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.IIcon;
@@ -46,11 +45,6 @@ public class ItemRendererTank implements IItemRenderer {
 
     private static final double U = 1.0 / 16.0;
 
-    // Packed full-bright brightness (skyLight=15, blockLight=15): (15 << 20) | (15 << 4). Used to
-    // bake full-bright per-vertex for the inventory tape overlay (mirrors BlockTankRenderer /
-    // RenderTileTank's FULL_BRIGHT).
-    private static final int FULL_BRIGHT = 0x00F000F0;
-
     @Override
     public boolean handleRenderType(ItemStack item, IItemRenderer.ItemRenderType type) {
         return true;
@@ -75,7 +69,9 @@ public class ItemRendererTank implements IItemRenderer {
         // carrying the live tile's portable NBT. Render the full live state (frame + fluid +
         // seal/trim/lock/void overlays) so the WAILA display matches the in-world tank instead of
         // a clear-slate empty tank. Real sealed tank items (inventory/hand/dropped) do NOT carry
-        // this marker, so they keep their existing tape-only behavior.
+        // this marker, but the else branch now renders the same full live state for them too (the
+        // tape is drawn by renderInventoryOverlays via isSealed()), so a sealed tank item matches
+        // its in-world appearance rather than showing only the tape.
         boolean wailaLive = tag != null && tag.getBoolean("WailaLive");
 
         if (wailaLive && hasTile) {
@@ -120,50 +116,36 @@ public class ItemRendererTank implements IItemRenderer {
             // "glows near-white in darkness" regression from the prior unconditional setBrightness.
             boolean inventoryFullBright = (type == IItemRenderer.ItemRenderType.INVENTORY);
 
-            // Draw the base frame + glass. Pass fullBright so the inventory/hotbar icon is forced
-            // full-bright (GL_LIGHTING off + baked FULL_BRIGHT); held/dropped inherit ambient.
-            ISBRH.renderInventoryFrame(block, block.getIconTank(), renderer, inventoryFullBright);
-
-            // If the item is sealed (has "Tile" portable NBT), draw the tape overlay on top. The
-            // tape is a separate Tessellator batch (renderInventoryFrame already closed its own), so
-            // it must re-establish the same GL state: blend + alphaFunc for the tape icon's
-            // transparent pixels, and (for the inventory icon) GL_LIGHTING off + baked FULL_BRIGHT so
-            // the tape is full-bright and not darkened by the leaked first-person-hand light.
-            // Without this the sealed tank re-introduced both the opaque-glass and the
-            // darker-while-holding symptoms: the tape's transparent pixels rendered opaque (no blend)
-            // and the leaked light darkened them, masking the fixed frame+glass behind.
             if (hasTile) {
-                IIcon tapeIcon = block.getIconTape();
-                if (tapeIcon != null) {
-                    GL11.glTranslatef(-0.5F, -0.5F, -0.5F);
-                    GL11.glPushAttrib(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT | GL11.GL_LIGHTING_BIT);
-                    GL11.glEnable(GL11.GL_ALPHA_TEST);
-                    GL11.glAlphaFunc(GL11.GL_GREATER, 0.1F);
-                    GL11.glEnable(GL11.GL_BLEND);
-                    OpenGlHelper.glBlendFunc(770, 771, 1, 0);
-                    if (inventoryFullBright) {
-                        GL11.glDisable(GL11.GL_LIGHTING);
-                    }
-                    Tessellator tess = Tessellator.instance;
-                    tess.startDrawingQuads();
-                    if (inventoryFullBright) {
-                        tess.setBrightness(FULL_BRIGHT);
-                    }
-                    tess.setColorOpaque_F(1.0F, 1.0F, 1.0F);
-                    double off = 0.003;
-                    renderer.setRenderBounds(0, 0, -off, 1, 1, 1);
-                    renderer.renderFaceZNeg(block, 0, 0, 0, tapeIcon);
-                    renderer.setRenderBounds(0, 0, 0, 1, 1, 1 + off);
-                    renderer.renderFaceZPos(block, 0, 0, 0, tapeIcon);
-                    renderer.setRenderBounds(-off, 0, 0, 1, 1, 1);
-                    renderer.renderFaceXNeg(block, 0, 0, 0, tapeIcon);
-                    renderer.setRenderBounds(0, 0, 0, 1 + off, 1, 1);
-                    renderer.renderFaceXPos(block, 0, 0, 0, tapeIcon);
-                    tess.draw();
-                    GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-                    GL11.glPopAttrib();
-                    GL11.glTranslatef(0.5F, 0.5F, 0.5F);
-                }
+                // Sealed tank item: reconstruct the transient TileTank from the portable NBT (same
+                // as the WAILA path) and render the FULL live state -- frame + glass + fluid +
+                // upgrade/key overlays -- so the item matches the in-world placed appearance. The
+                // tape (seal) overlay is drawn by renderInventoryOverlays (gated on isSealed()),
+                // along with the storage-trim / lock-claim / void indicators, so a sealed tank in
+                // the inventory/hotbar shows its contents + overlays + tape instead of only the
+                // tape. worldObj stays null; readFromPortableNBT + the render helpers touch only
+                // portable state (null-world-safe).
+                TileTank tile = new TileTank();
+                tile.readFromPortableNBT(tag.getCompoundTag("Tile"));
+
+                // Base frame + glass. Use the vending texture when the tank has a Creative Vending
+                // upgrade, mirroring renderWorldBlock's in-world check. fullBright forces the
+                // inventory/hotbar icon full-bright (GL_LIGHTING off + baked FULL_BRIGHT);
+                // held/dropped inherit ambient.
+                IIcon frameIcon = tile.isVending() ? block.getIconTankVending() : block.getIconTank();
+                ISBRH.renderInventoryFrame(block, frameIcon, renderer, inventoryFullBright);
+
+                // Fluid + overlays are drawn in block-local 0..1 space; wrap in a -0.5 translate to
+                // center the model (matching renderInventoryFrame's own centering + the WAILA path).
+                // renderFluidForItem bakes FULL_BRIGHT; renderInventoryOverlays manages its own
+                // blend + bakes FULL_BRIGHT (and draws the tape when isSealed()).
+                GL11.glTranslatef(-0.5F, -0.5F, -0.5F);
+                RenderTileTank.renderFluidForItem(tile);
+                ISBRH.renderInventoryOverlays(block, tile, renderer);
+                GL11.glTranslatef(0.5F, 0.5F, 0.5F);
+            } else {
+                // Empty / unsealed tank: frame + glass only (no fluid, no overlays, no tape).
+                ISBRH.renderInventoryFrame(block, block.getIconTank(), renderer, inventoryFullBright);
             }
         }
     }
