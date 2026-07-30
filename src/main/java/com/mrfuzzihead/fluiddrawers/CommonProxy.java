@@ -5,6 +5,7 @@ import com.mrfuzzihead.fluiddrawers.init.ModBlocks;
 import com.mrfuzzihead.fluiddrawers.init.ModRecipes;
 import com.mrfuzzihead.fluiddrawers.tile.TileTank;
 
+import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLInterModComms;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
@@ -13,6 +14,8 @@ import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import cpw.mods.fml.common.registry.GameRegistry;
 
 public class CommonProxy {
+
+    public static final String WAILA = "Waila";
 
     public void preInit(FMLPreInitializationEvent event) {
         Config.synchronizeConfiguration(event.getSuggestedConfigurationFile());
@@ -27,15 +30,12 @@ public class CommonProxy {
         ModRecipes.init();
 
         // Register WAILA integration if WAILA is loaded (compileOnly + runtimeOnly dep).
-        try {
-            Class.forName("mcp.mobius.waila.api.IWailaRegistrar");
+        if (Loader.isModLoaded(WAILA))
+        {
             FMLInterModComms.sendMessage(
-                "Waila",
+                WAILA,
                 "register",
                 "com.mrfuzzihead.fluiddrawers.integration.WailaIntegration.registerProvider");
-            FluidDrawers.LOG.info("WAILA integration registered");
-        } catch (ClassNotFoundException e) {
-            // WAILA not available — integration skipped silently.
         }
     }
 

@@ -147,7 +147,7 @@ The 1.12.2 source is layered on three things that **do not exist in 1.7.10** and
 - **Depends on:** 7, 10.
 
 ### STRETCH GOALS
-- Framed Tank
+- **Framed Tank**
 - ~~Controller integration~~
 - ~~FCD compat NOT NEEDED~~
 - ~~Waila integration~~
