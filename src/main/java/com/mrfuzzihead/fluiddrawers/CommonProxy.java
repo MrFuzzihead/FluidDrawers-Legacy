@@ -4,6 +4,7 @@ import com.mrfuzzihead.fluiddrawers.init.FdGuis;
 import com.mrfuzzihead.fluiddrawers.init.ModBlocks;
 import com.mrfuzzihead.fluiddrawers.init.ModRecipes;
 import com.mrfuzzihead.fluiddrawers.tile.TileTank;
+import com.mrfuzzihead.fluiddrawers.tile.TileTankCustom;
 
 import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
@@ -23,6 +24,7 @@ public class CommonProxy {
         ModBlocks.init();
 
         GameRegistry.registerTileEntity(TileTank.class, FluidDrawers.MODID + "_tile");
+        GameRegistry.registerTileEntity(TileTankCustom.class, FluidDrawers.MODID + "_tile_custom");
     }
 
     public void init(FMLInitializationEvent event) {

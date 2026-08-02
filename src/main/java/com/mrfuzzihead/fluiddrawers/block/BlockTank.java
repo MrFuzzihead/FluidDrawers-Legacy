@@ -69,9 +69,17 @@ public class BlockTank extends Block implements ITileEntityProvider, INetworked 
         "ruby", "tanzanite" };
 
     public BlockTank() {
-        super(Material.iron);
+        this(FluidDrawers.MODID + ".tank", Material.iron);
+    }
+
+    /**
+     * Protected constructor for subclasses (the framed tank variant). Lets the subclass choose its
+     * own unlocalized name and material while sharing the common frame/glass behaviour.
+     */
+    protected BlockTank(String blockName, Material material) {
+        super(material);
         this.isBlockContainer = true;
-        this.setBlockName(FluidDrawers.MODID + ".tank");
+        this.setBlockName(blockName);
         this.setHardness(5.0F);
         this.setStepSound(soundTypeMetal);
         this.setCreativeTab(FluidDrawersCreativeTab.INSTANCE);
