@@ -57,8 +57,8 @@ public class ItemRendererTankCustom implements IItemRenderer {
 
             IIcon sideIcon = resolve(tile.getMaterialSide(), block.getDefaultTexture());
             IIcon trimIcon = resolve(tile.getMaterialTrim(), block.getDefaultTexture());
-            int glassTint = BlockTankCustomRenderer.resolveGlassTint(tile.getMaterialFront());
-            ISBRH.renderInventoryShape(block, sideIcon, trimIcon, glassTint, renderer, inventoryFullBright);
+            IIcon glassIcon = BlockTankCustomRenderer.resolveGlassIcon(tile.getMaterialFront(), block.getIconGlass());
+            ISBRH.renderInventoryShape(block, sideIcon, trimIcon, glassIcon, renderer, inventoryFullBright);
 
             // Fluid + overlays are drawn in block-local 0..1 space; wrap in a -0.5 translate.
             GL11.glTranslatef(-0.5F, -0.5F, -0.5F);
@@ -68,8 +68,8 @@ public class ItemRendererTankCustom implements IItemRenderer {
         } else {
             IIcon sideIcon = resolve(readMaterial(tag, "MatS"), block.getDefaultTexture());
             IIcon trimIcon = resolve(readMaterial(tag, "MatT"), block.getDefaultTexture());
-            int glassTint = BlockTankCustomRenderer.resolveGlassTint(readMaterial(tag, "MatF"));
-            ISBRH.renderInventoryShape(block, sideIcon, trimIcon, glassTint, renderer, inventoryFullBright);
+            IIcon glassIcon = BlockTankCustomRenderer.resolveGlassIcon(readMaterial(tag, "MatF"), block.getIconGlass());
+            ISBRH.renderInventoryShape(block, sideIcon, trimIcon, glassIcon, renderer, inventoryFullBright);
         }
     }
 

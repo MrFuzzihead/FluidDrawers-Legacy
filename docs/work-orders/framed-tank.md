@@ -55,10 +55,15 @@
   were drawing their inward faces instead of the outward faces). Mirrors the 0.05 offsets in
   `tank_custom_base.json`.
 - **Glass tint (front material):** the framing table's front slot (slot 3) only accepts glass
-  blocks/panes (clear or stained) when the input is a framed tank. The front material tints the
-  rendered window via `Block.getRenderColor(meta)` (`BlockTankCustomRenderer.resolveGlassTint` +
-  `renderGlassTinted`), applied in-world and to the item icon. Clear glass/pane = untinted;
-  stained glass/pane = tinted. Side/trim stay opaque-only (`MixinTileEntityFramingTable`).
+  blocks/panes (clear or stained) when the input is a framed tank. The front material colours the
+  rendered window via its own block icon (`BlockTankCustomRenderer.resolveGlassIcon` ->
+  `block.getIcon(4, meta)`), applied in-world and to the item icon. Clear glass/pane = plain glass;
+  stained glass/pane = the baked-colour `glass_<color>` texture. Side/trim stay opaque-only
+  (`MixinTileEntityFramingTable`).
+  **IMPORTANT (1.7.10 quirk):** `Block.getRenderColor(meta)` returns white (0xFFFFFF) for stained
+  glass -- the colour lives in the baked per-colour textures (`BlockStainedGlass.getIcon` returns
+  `glass_<color>`; it does NOT override `getRenderColor`). Do NOT use `getRenderColor` for the
+  window tint; resolve the material's own icon instead.
 - **Glass-front is tank-exclusive:** `TileEntityFramingTable.isItemValidMaterial` is NOT extended,
   so glass is not a generic framing-table material and SD framed drawers are unaffected. Shift-click
   of glass into the tank's front slot is handled by a tank-scoped

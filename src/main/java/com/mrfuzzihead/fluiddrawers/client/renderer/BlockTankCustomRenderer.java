@@ -48,19 +48,24 @@ public class BlockTankCustomRenderer extends BlockTankRenderer {
         if (!(block instanceof BlockTankCustom)) return;
         BlockTankCustom tank = (BlockTankCustom) block;
         // Default (raw / un-framed) framed tank for creative tab / block picker.
-        renderInventoryShape(tank, tank.getDefaultTexture(), tank.getDefaultTexture(), 0xFFFFFF, renderer, true);
+        renderInventoryShape(
+            tank,
+            tank.getDefaultTexture(),
+            tank.getDefaultTexture(),
+            tank.getIconGlass(),
+            renderer,
+            true);
     }
 
     /**
      * Renders the framed tank (frame + trim + glass) in inventory/item icon space, mirroring
      * {@link BlockTankRenderer#renderInventoryFrame}'s GL setup but drawing the frame with
-     * {@code sideIcon}, the trim border with {@code trimIcon}, and the glass tinted by
-     * {@code glassTint} (0xRRGGBB; white = clear).
+     * {@code sideIcon}, the trim border with {@code trimIcon}, and the window with {@code glassIcon}
+     * (the front material's own icon -- clear glass is plain, stained glass is the baked-colour
+     * texture).
      */
-    public void renderInventoryShape(BlockTankCustom tank, IIcon sideIcon, IIcon trimIcon, int glassTint,
+    public void renderInventoryShape(BlockTankCustom tank, IIcon sideIcon, IIcon trimIcon, IIcon glassIcon,
         RenderBlocks renderer, boolean fullBright) {
-        IIcon iconGlass = tank.getIconGlass();
-
         Tessellator tess = Tessellator.instance;
         boolean prevAO = renderer.enableAO;
         renderer.enableAO = false;
@@ -83,7 +88,7 @@ public class BlockTankCustomRenderer extends BlockTankRenderer {
         }
         renderFramedFrame(tank, sideIcon, renderer, 0.0, 0.0, 0.0);
         renderTrim(tank, trimIcon, renderer, 0.0, 0.0, 0.0);
-        renderGlassTinted(tank, iconGlass, renderer, 0.0, 0.0, 0.0, glassTint);
+        renderGlass(tank, glassIcon, renderer, 0.0, 0.0, 0.0);
         tess.draw();
 
         GL11.glTranslatef(0.5F, 0.5F, 0.5F);
@@ -126,11 +131,12 @@ public class BlockTankCustomRenderer extends BlockTankRenderer {
             renderFramedFrame(tank, sideIcon, renderer, x, y, z);
             renderTrim(tank, trimIcon, renderer, x, y, z);
         } else if (pass == 1) {
-            // Alpha pass: tinted glass interior + indicators. The front material is the window:
-            // clear glass stays clear, stained glass tints the pane (white = no tint).
-            int glassTint = tile != null && tile.getMaterialFront() != null ? resolveGlassTint(tile.getMaterialFront())
-                : 0xFFFFFF;
-            renderGlassTinted(tank, tank.getIconGlass(), renderer, x, y, z, glassTint);
+            // Alpha pass: window + indicators. The front material is the window -- its own icon
+            // carries the colour (clear glass is plain, stained glass is the baked-colour texture).
+            IIcon glassIcon = tile != null && tile.getMaterialFront() != null
+                ? resolveGlassIcon(tile.getMaterialFront(), tank.getIconGlass())
+                : tank.getIconGlass();
+            renderGlass(tank, glassIcon, renderer, x, y, z);
             if (te instanceof TileTank) {
                 renderOverlays(tank, (TileTank) te, renderer, x, y, z);
             }
@@ -245,86 +251,18 @@ public class BlockTankCustomRenderer extends BlockTankRenderer {
     }
 
     /**
-     * Draws the interior glass cube tinted by {@code tint} (0xRRGGBB). Ports the {@code #front}
-     * element of {@code tank_custom_base.json} (1px..15px cube, 4 side faces) and applies the same
-     * directional shading as the base renderer, multiplied by the tint -- the vanilla stained-glass
-     * behaviour (glass texture + color multiplier).
+     * Resolves the icon for the tank's front/window material. Only glass materials change the
+     * window: the material's own icon is used, so clear glass/pane gives the plain glass texture and
+     * stained glass/pane gives its baked-colour texture ({@code glass_<color>}). 1.7.10 stores the
+     * stained-glass colour in the texture (see {@code BlockStainedGlass.getIcon}/{@code registerBlockIcons};
+     * {@code Block.getRenderColor} stays white for these). Non-glass materials fall back to clear glass.
      */
-    private void renderGlassTinted(BlockTank tank, IIcon icon, RenderBlocks renderer, double x, double y, double z,
-        int tint) {
-        float tr = ((tint >> 16) & 0xFF) / 255.0F;
-        float tg = ((tint >> 8) & 0xFF) / 255.0F;
-        float tb = (tint & 0xFF) / 255.0F;
-        drawBox(
-            renderer,
-            tank,
-            icon,
-            x,
-            y,
-            z,
-            U,
-            U,
-            U,
-            15 * U,
-            15 * U,
-            15 * U,
-            false,
-            false,
-            true,
-            true,
-            true,
-            true,
-            tr,
-            tg,
-            tb);
-    }
-
-    /**
-     * {@link BlockTankRenderer#drawBox} variant that multiplies the per-face directional shading
-     * (0.5/1.0/0.8/0.8/0.6/0.6) by a tint colour ({@code tr}/{@code tg}/{@code tb} in 0..1).
-     */
-    private void drawBox(RenderBlocks renderer, Block block, IIcon icon, double x, double y, double z, double minX,
-        double minY, double minZ, double maxX, double maxY, double maxZ, boolean bottom, boolean top, boolean north,
-        boolean south, boolean west, boolean east, float tr, float tg, float tb) {
-        renderer.setRenderBounds(minX, minY, minZ, maxX, maxY, maxZ);
-        Tessellator tess = Tessellator.instance;
-        if (bottom) {
-            tess.setColorOpaque_F(0.5F * tr, 0.5F * tg, 0.5F * tb);
-            renderer.renderFaceYNeg(block, x, y, z, icon);
-        }
-        if (top) {
-            tess.setColorOpaque_F(tr, tg, tb);
-            renderer.renderFaceYPos(block, x, y, z, icon);
-        }
-        if (north) {
-            tess.setColorOpaque_F(0.8F * tr, 0.8F * tg, 0.8F * tb);
-            renderer.renderFaceZNeg(block, x, y, z, icon);
-        }
-        if (south) {
-            tess.setColorOpaque_F(0.8F * tr, 0.8F * tg, 0.8F * tb);
-            renderer.renderFaceZPos(block, x, y, z, icon);
-        }
-        if (west) {
-            tess.setColorOpaque_F(0.6F * tr, 0.6F * tg, 0.6F * tb);
-            renderer.renderFaceXNeg(block, x, y, z, icon);
-        }
-        if (east) {
-            tess.setColorOpaque_F(0.6F * tr, 0.6F * tg, 0.6F * tb);
-            renderer.renderFaceXPos(block, x, y, z, icon);
-        }
-    }
-
-    /**
-     * Resolves the glass tint (0xRRGGBB) for the tank's front/window material. Only glass materials
-     * tint the window: clear glass/pane -> white (no tint); stained glass/pane -> the vanilla
-     * {@code Block.getRenderColor} colour. Non-glass materials are ignored (white), matching the
-     * current fallback of clear glass.
-     */
-    public static int resolveGlassTint(ItemStack frontMaterial) {
-        if (!ItemBlockTankCustom.isGlassMaterial(frontMaterial)) return 0xFFFFFF;
+    public static IIcon resolveGlassIcon(ItemStack frontMaterial, IIcon fallback) {
+        if (!ItemBlockTankCustom.isGlassMaterial(frontMaterial)) return fallback;
         Block block = Block.getBlockFromItem(frontMaterial.getItem());
-        if (block == null) return 0xFFFFFF;
-        return block.getRenderColor(frontMaterial.getItemDamage()) & 0xFFFFFF;
+        if (block == null) return fallback;
+        IIcon icon = block.getIcon(4, frontMaterial.getItemDamage());
+        return icon != null ? icon : fallback;
     }
 
     public static IIcon resolveMaterial(ItemStack stack, IIcon fallback) {
