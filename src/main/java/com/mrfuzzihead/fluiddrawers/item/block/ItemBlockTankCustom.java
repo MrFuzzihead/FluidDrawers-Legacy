@@ -3,7 +3,10 @@ package com.mrfuzzihead.fluiddrawers.item.block;
 import java.util.List;
 
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockStainedGlass;
+import net.minecraft.block.BlockStainedGlassPane;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.init.Blocks;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -88,6 +91,23 @@ public class ItemBlockTankCustom extends ItemBlockTank {
         mat = mat.copy();
         mat.stackSize = 1;
         return mat.writeToNBT(new NBTTagCompound());
+    }
+
+    /**
+     * True if the stack is a glass block or pane (clear or stained). The tank's front ("window")
+     * material in the framing table only accepts glass -- clear glass gives an untinted window,
+     * stained glass tints it (via {@code Block.getRenderColor}). Shared by the framing-table mixin
+     * (server + client) and the client-side tint resolver.
+     */
+    public static boolean isGlassMaterial(ItemStack stack) {
+        if (stack == null || stack.getItem() == null) return false;
+        Block block = Block.getBlockFromItem(stack.getItem());
+        if (block == null) return false;
+        return block == Blocks.glass || block == Blocks.stained_glass
+            || block == Blocks.glass_pane
+            || block == Blocks.stained_glass_pane
+            || block instanceof BlockStainedGlass
+            || block instanceof BlockStainedGlassPane;
     }
 
     @Override

@@ -54,8 +54,25 @@
   bars' outer faces. Also corrected the north/south face flags on the bottom/top edge bars (they
   were drawing their inward faces instead of the outward faces). Mirrors the 0.05 offsets in
   `tank_custom_base.json`.
+- **Glass tint (front material):** the framing table's front slot (slot 3) only accepts glass
+  blocks/panes (clear or stained) when the input is a framed tank. The front material tints the
+  rendered window via `Block.getRenderColor(meta)` (`BlockTankCustomRenderer.resolveGlassTint` +
+  `renderGlassTinted`), applied in-world and to the item icon. Clear glass/pane = untinted;
+  stained glass/pane = tinted. Side/trim stay opaque-only (`MixinTileEntityFramingTable`).
+- **Glass-front is tank-exclusive:** `TileEntityFramingTable.isItemValidMaterial` is NOT extended,
+  so glass is not a generic framing-table material and SD framed drawers are unaffected. Shift-click
+  of glass into the tank's front slot is handled by a tank-scoped
+  `MixinContainerFramingTable#fluiddrawers$shiftGlassToTankFront` injection on
+  `ContainerFramingTable.transferStackInSlot` that merges glass only into the front slot (manual
+  click placement goes through the tile's `isItemValidForSlot` mixin).
+- **Mixin shadow constraint (crash fix):** the container mixin must NOT shadow inherited
+  `Container` members -- `@Shadow` on `mergeItemStack`/`inventorySlots` (declared in `Container`,
+  not `ContainerFramingTable`) fails at apply time with "was not located in the target class" and
+  crashes the framing table (`NoClassDefFoundError: ...ContainerFramingTable`). The shift-click
+  merge therefore uses only shadows of fields declared directly in `ContainerFramingTable`
+  (`tableInventory`, `inputSlot`, `materialFrontSlot`, `playerSlots`, `hotbarSlots`) and performs
+  the front-slot placement manually against the public `Slot`/`ItemStack` API.
 
-Glass tint (stretch) is NOT implemented — deferred: needs a synced tile tint field
-(`getGlassTint`/`setGlassTint`), NBT + portable NBT on `TileTankCustom`, a tinted-glass render path
-in `BlockTankCustomRenderer.renderGlass` / `ItemRendererTankCustom`, and (likely) a JSON message or
-block-activation/cycle interaction. Frame this as a follow-up work order.
+Glass tint stretch originally planned as a follow-up is now implemented via the front material
+instead of a separate dyed-tint field (chosen because it reuses the existing material/NBT path and
+the vanilla stained-glass color lookup; a dye-based tint would need a new synced field + interaction).
