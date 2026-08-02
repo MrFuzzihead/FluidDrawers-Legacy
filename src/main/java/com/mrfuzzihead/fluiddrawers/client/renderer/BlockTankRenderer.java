@@ -34,13 +34,13 @@ import cpw.mods.fml.client.registry.ISimpleBlockRenderingHandler;
  */
 public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
 
-    private static final double U = 1.0 / 16.0;
+    protected static final double U = 1.0 / 16.0;
 
     // Packed full-bright brightness (skyLight=15, blockLight=15): (15 << 20) | (15 << 4). Used
     // for the item-icon overlay path (WAILA HUD) where there is no world to sample brightness
     // from; raw addVertexWithUV quads would otherwise render solid black (the classic 1.7.10
     // TESR brightness trap). Matches RenderTileTank.FULL_BRIGHT.
-    private static final int FULL_BRIGHT = 0x00F000F0;
+    protected static final int FULL_BRIGHT = 0x00F000F0;
 
     @Override
     public void renderInventoryBlock(Block block, int metadata, int modelId, RenderBlocks renderer) {
@@ -180,7 +180,7 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
         return true;
     }
 
-    private void renderMetalFrame(BlockTank tank, IIcon icon, RenderBlocks renderer, double x, double y, double z) {
+    protected void renderMetalFrame(BlockTank tank, IIcon icon, RenderBlocks renderer, double x, double y, double z) {
         // bottom slab (all 6 faces)
         drawBox(renderer, tank, icon, x, y, z, 0, 0, 0, 1, 2 * U, 1, true, true, true, true, true, true);
         // top slab (all 6 faces)
@@ -247,7 +247,7 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
             true);
     }
 
-    private void renderGlass(BlockTank tank, IIcon icon, RenderBlocks renderer, double x, double y, double z) {
+    protected void renderGlass(BlockTank tank, IIcon icon, RenderBlocks renderer, double x, double y, double z) {
         // inner glass cube (4 side faces only, no top/bottom -- matches the 1.12.2 model)
         drawBox(
             renderer,
@@ -272,7 +272,7 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
 
     // --- Phase 11/10 overlay rendering ---
 
-    private void renderOverlays(BlockTank tank, TileTank tile, RenderBlocks renderer, double x, double y, double z) {
+    protected void renderOverlays(BlockTank tank, TileTank tile, RenderBlocks renderer, double x, double y, double z) {
         Tessellator tess = Tessellator.instance;
         tess.setColorOpaque_F(1.0F, 1.0F, 1.0F);
 
@@ -478,7 +478,7 @@ public class BlockTankRenderer implements ISimpleBlockRenderingHandler {
      * getMixedBrightnessForBlock for world). Per-face directional shading is applied so faces are
      * lit rather than flat/black.
      */
-    private void drawBox(RenderBlocks renderer, Block block, IIcon icon, double x, double y, double z, double minX,
+    protected void drawBox(RenderBlocks renderer, Block block, IIcon icon, double x, double y, double z, double minX,
         double minY, double minZ, double maxX, double maxY, double maxZ, boolean bottom, boolean top, boolean north,
         boolean south, boolean west, boolean east) {
         renderer.setRenderBounds(minX, minY, minZ, maxX, maxY, maxZ);

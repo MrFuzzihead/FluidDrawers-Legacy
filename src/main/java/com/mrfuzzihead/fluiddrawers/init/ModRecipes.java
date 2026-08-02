@@ -69,5 +69,17 @@ public final class ModRecipes {
                 new ItemStack(Blocks.heavy_weighted_pressure_plate),
                 'B',
                 Items.bucket));
+
+        // Framed Fluid Tank (1.12.2 tank_custom.json): wrap the base tank in sticks.
+        GameRegistry.addRecipe(
+            new ShapedOreRecipe(
+                new ItemStack(ModBlocks.TANK_CUSTOM),
+                "SSS",
+                "STS",
+                "SSS",
+                'S',
+                "stickWood",
+                'T',
+                new ItemStack(ModBlocks.TANK)));
     }
 }
