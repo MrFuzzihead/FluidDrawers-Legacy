@@ -64,11 +64,16 @@ public class MixinContainerFramingTable {
     @Shadow(remap = false)
     private List<Slot> hotbarSlots;
 
+    // Keep remapping ENABLED on this injector. onCraftMatrixChanged overrides Container.func_75130_a,
+    // so it is reobfuscated to func_75130_a in the released Storage Drawers jar. With remap = false
+    // the injector only matches the literal MCP name, finds nothing in production, and silently
+    // no-ops (GTNH Mixin defaultRequireValue is 0) -- the table then never produces a framed tank,
+    // while still working in the MCP dev environment. The generated refmap entry is the fix; this is
+    // the same SRG/refmap bug FCD fixed in FramedCompactDrawers-Legacy PR #4.
     @Inject(
         method = "onCraftMatrixChanged(Lnet/minecraft/inventory/IInventory;)V",
         at = @At("HEAD"),
-        cancellable = true,
-        remap = false)
+        cancellable = true)
     private void fluiddrawers$handleFramedTank(IInventory inventory, CallbackInfo ci) {
         ItemStack target = tableInventory.getStackInSlot(inputSlot.getSlotIndex());
         if (target == null) return;
@@ -87,11 +92,12 @@ public class MixinContainerFramingTable {
         ci.cancel();
     }
 
+    // Remapping ENABLED for the same reason: transferStackInSlot overrides Container.func_82846_b and
+    // is therefore reobfuscated in production. remap = false would silently drop this injection too.
     @Inject(
         method = "transferStackInSlot(Lnet/minecraft/entity/player/EntityPlayer;I)Lnet/minecraft/item/ItemStack;",
         at = @At("HEAD"),
-        cancellable = true,
-        remap = false)
+        cancellable = true)
     private void fluiddrawers$shiftGlassToTankFront(EntityPlayer player, int slotIndex,
         CallbackInfoReturnable<ItemStack> cir) {
         if (playerSlots.isEmpty() || hotbarSlots.isEmpty()) return;

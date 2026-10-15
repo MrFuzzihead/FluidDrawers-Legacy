@@ -248,13 +248,37 @@ Every user-facing string (GUI titles, lock/seal/ownership messages, upgrade tool
 > fluid container (bucket, etc.) fills/drains connected tanks via `BlockInteractionUtils`; and (c)
 > exposing `IFluidHandler` also lets pipes/hoppers pump to/from the controller → distributed to
 > tanks. `BlockTank implements INetworked` so the network geometry routes through tanks. The
-> `@Shadow`/`@Inject` mod-class targets use `remap=false`; inherited `TileEntity` fields are
-> reached by declaring the mixin `extends TileEntity` (reobf-safe, no refmap). The reflection-based
-> `DrawerReflect` port was deleted as obsolete. `./gradlew build` PASS, zero mixin warnings, empty
-> refmap (correct for mod-class targets). **Pending:** `runClient` in-game verification
-> (right-click controller with water bucket → connected tank fills; empty bucket → drains).
+> `@Shadow`/`@Inject` targets that are **StorageDrawers-owned** members (not present in vanilla)
+> use `remap=false`; inherited `TileEntity` fields are reached by declaring the mixin `extends
+> TileEntity` (reobf-safe, no refmap). The reflection-based `DrawerReflect` port was deleted as
+> obsolete. `./gradlew build` PASS, zero mixin warnings. **Pending:** `runClient` in-game
+> verification (right-click controller with water bucket → connected tank fills; empty bucket →
+> drains).
+>
+> **SRG/refmap rule (corrected 2026-10-15):** a mixin in a *mod* class is **not** automatically
+> `remap=false`. If the targeted method **overrides a vanilla member** (e.g. `TileEntity`'s
+> `isItemValidForSlot` → `func_94041_b`, `Container`'s `onCraftMatrixChanged` → `func_75130_a` and
+> `transferStackInSlot` → `func_82846_b`), it is reobfuscated in the released SD jar and the
+> injector **must keep remapping enabled** so the annotation processor emits a refmap entry.
+> `remap=false` there matches only the literal MCP name, finds nothing in production, and silently
+> no-ops (GTNH Mixin `defaultRequireValue` is `0`) while still working in the dev environment — so
+> the generated refmap must be **non-empty** for any such injector. Only members declared by
+> StorageDrawers itself (`isItemValidDrawer`, `updateCache`, `interactPutItemsIntoInventory`, the
+> `range` field) are genuinely `remap=false`.
 >
 > **Bug found during in-game test (2026-07-28) — FIXED:** the bucket did nothing because the mixin
 > was never applied. `TargetMods.STORAGEDRAWERS` used mod id `"storagedrawers"` but SD declares
 > `@Mod(modid="StorageDrawers")`; `TargetModBuilder.isTargetPresent` matches case-sensitively, so
 > the entry was filtered out of the late-mixin set. Fixed to `"StorageDrawers"`. **Pending re-test.**
+>
+> **Bug found via FCD PR #4 analysis (2026-10-15) — FIXED (3 injectors):** the same SRG/refmap trap
+> as FramedCompactDrawers-Legacy PR #4. `MixinContainerFramingTable`'s `onCraftMatrixChanged` and
+> `transferStackInSlot` injectors and `MixinTileEntityFramingTable`'s `isItemValidForSlot` injector
+> all carried `remap=false` on *vanilla-overriding* methods, so their refmap entries were never
+> generated (the release jar shipped `{"mappings":{}}`). In production this silently disabled:
+> framed-tank output in the framing table (FCD's exact bug), shift-clicking glass into the tank
+> front slot, and the tank's framing-table slot-validation rules. Removing `remap=false` from those
+> three injectors makes `:compileJava` emit the refmap entries
+> (`func_75130_a`/`func_82846_b`/`func_94041_b`), verified present in the reobf jar. The remaining
+> `remap=false` usages (SD-field `@Shadow`s, `isItemValidDrawer`, `updateCache`,
+> `interactPutItemsIntoInventory`) are correct because those members are StorageDrawers-owned.

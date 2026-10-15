@@ -339,3 +339,37 @@ Audited all GL-state churn in the item/TE render paths (`BlockTankRenderer.rende
 4. **No regression — dark-at-night hand/drop:** at night, hold the tank + drop one → both should still be ambient-dark (not glowing near-white), preserving Finding 3's fix.
 5. **Sealed tank item shows contents:** seal a tank with lava (+ upgrades/keys) → the sealed ITEM in the hotbar/inventory/hand/dropped should now show the lava fluid + upgrade trim + lock/claim/void overlays + the tape (matching the in-world placed appearance), not just the tape. An empty/unsealed tank item still shows frame+glass only.
 
+
+## Mixin SRG/refmap fix — vanilla-overriding injectors (2026-10-15)
+
+Analysis of FramedCompactDrawers-Legacy PR #4 revealed the same class of bug here, in **three**
+injectors (not one). The released jar had shipped an **empty refmap** (`{"mappings":{}}`).
+
+| Injector | Method | SRG (production) | Was | Now |
+|----------|--------|------------------|-----|-----|
+| `MixinContainerFramingTable#fluiddrawers$handleFramedTank` | `onCraftMatrixChanged` (overrides `Container`) | `func_75130_a` | `remap=false` → silent no-op | remap enabled |
+| `MixinContainerFramingTable#fluiddrawers$shiftGlassToTankFront` | `transferStackInSlot` (overrides `Container`) | `func_82846_b` | `remap=false` → silent no-op | remap enabled |
+| `MixinTileEntityFramingTable#fluiddrawers$tankSlotRules` | `isItemValidForSlot` (overrides `IInventory`) | `func_94041_b` | `remap=false` → silent no-op | remap enabled |
+
+**Production impact (before fix):** framed tanks were never produced in the framing table (FCD's
+exact bug), shift-clicking glass into the tank window did nothing, and the tank's framing-table slot
+rules (slot 0 accepts tank, slot 4 rejected, front = glass-only, side/trim = opaque-only) were
+ignored. All three worked in dev, masking the problem.
+
+**Correctness check:** the remaining `remap=false` usages are still correct — they target
+StorageDrawers-*owned* members that are never reobfuscated: `MixinContainerFramingTable`'s SD-field
+`@Shadow`s, `MixinTileEntityFramingTable#fluiddrawers$acceptFramedTank` (`isItemValidDrawer`),
+`MixinTileEntityController`'s `range` shadow + `updateCache` + `interactPutItemsIntoInventory`
+(confirmed declared in `TileEntityController`, not inherited from vanilla). Inherited `TileEntity`
+fields (`worldObj`, `xCoord`, …) remain reobf-safe via `MixinTileEntityController extends TileEntity`.
+
+### Verification
+| Date       | Check                                                                                   | Result |
+|------------|-----------------------------------------------------------------------------------------|--------|
+| 2026-10-15 | `./gradlew compileJava` — refmap now contains all 3 entries (`func_75130_a`, `func_82846_b`, `func_94041_b`) | **PASS** |
+| 2026-10-15 | `./gradlew build` — spotless + checkstyle + compile + jar + reobfJar clean              | **PASS** |
+| 2026-10-15 | Built reobf jar embeds populated `mixins.fluiddrawers.refmap.json` (not `{"mappings":{}}`) | **PASS** |
+
+**Requires a new release** — any previously published jar does not contain this fix.
+In a production instance the log should now show the three mixins being applied (e.g.
+`Mixing storagedrawers.MixinContainerFramingTable ... into ...ContainerFramingTable`).

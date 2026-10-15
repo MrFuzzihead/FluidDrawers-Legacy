@@ -42,11 +42,11 @@ public class MixinTileEntityFramingTable {
         }
     }
 
-    @Inject(
-        method = "isItemValidForSlot(ILnet/minecraft/item/ItemStack;)Z",
-        at = @At("HEAD"),
-        cancellable = true,
-        remap = false)
+    // Remapping ENABLED: isItemValidForSlot overrides IInventory.func_94041_b, so it is reobfuscated
+    // in production; with remap = false this injector would silently no-op in the modpack. The
+    // isItemValidDrawer injector above targets a StorageDrawers-owned static, so remap = false stays
+    // correct there. Same SRG/refmap class of bug as FCD PR #4.
+    @Inject(method = "isItemValidForSlot(ILnet/minecraft/item/ItemStack;)Z", at = @At("HEAD"), cancellable = true)
     private void fluiddrawers$tankSlotRules(int slot, ItemStack stack, CallbackInfoReturnable<Boolean> cir) {
         if (stack == null || stack.getItem() == null) return;
 
