@@ -1,0 +1,50 @@
+# FluidDrawers 中文语言文件
+# 方块
+tile.fluiddrawers.tank.name=储液抽屉
+tile.fluiddrawers.tank_custom.name=镶框储液抽屉
+
+# 界面
+fluiddrawers.container.tank=储液抽屉
+fluiddrawers.info.tank_capacity=容量: %s mB
+
+# 界面标签（来自 StorageDrawers）
+storagedrawers.container.upgrades=升级
+storagedrawers.drawers.sealed=已密封
+
+# 创造模式物品栏标签
+itemGroup.fluiddrawers=储液抽屉
+
+# 升级提示
+fluiddrawers.info.capacity_exceeded=无法移除升级: 流体量超过升级后的容量
+
+# 密封与安全提示
+fluiddrawers.msg.sealed=已密封储液抽屉
+fluiddrawers.msg.unsealed=已解除密封
+fluiddrawers.msg.owner_set=已设置所有者
+fluiddrawers.msg.owner_cleared=已清除所有者
+fluiddrawers.msg.locked=已锁定储液抽屉
+fluiddrawers.msg.unlocked=已解锁储液抽屉
+
+# WAILA 信息显示
+fluiddrawers.waila.empty=空
+fluiddrawers.waila.fluid=%s: %s / %s mB
+fluiddrawers.waila.fluid_unlimited=%s: %s / ∞ mB
+fluiddrawers.waila.fluid_creative=%s: [∞]
+fluiddrawers.waila.tank_prefix=储液抽屉
+fluiddrawers.waila.locked=已锁定
+fluiddrawers.waila.void=虚空模式
+fluiddrawers.waila.sealed=已密封
+fluiddrawers.waila.protected=受保护
+fluiddrawers.waila.creative=创造模式
+
+# 物品提示信息
+fluiddrawers.tooltip.fluid=%s: %s / %s mB
+fluiddrawers.tooltip.locked=已锁定
+fluiddrawers.tooltip.concealed=内容已隐藏
+fluiddrawers.tooltip.quantified=精确计量
+
+# 镶框储液抽屉提示信息
+fluiddrawers.tooltip.materials=材质: 
+fluiddrawers.tooltip.materialSide=侧面: 
+fluiddrawers.tooltip.materialTrim=边框: 
+fluiddrawers.tooltip.materialFront=正面: 
